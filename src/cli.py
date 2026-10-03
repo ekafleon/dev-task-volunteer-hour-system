@@ -88,6 +88,33 @@ def collect_participations(members):
     return list(parts.items())
 
 
+def update_member_dialog():
+    members = services.list_members()
+    if not members:
+        print("暂无成员。")
+        return
+    print("\n当前成员：")
+    for m in members:
+        print(f"  {m['id']}. {m['name']}  {m['note']}")
+    mid = input_int("要修改的成员id: ", min_value=1)
+    target = next((m for m in members if m["id"] == mid), None)
+    if not target:
+        print("未找到该成员。")
+        return
+    print(f"当前信息：姓名【{target['name']}】，备注【{target['note']}】")
+    name = input(f"新姓名【{target['name']}】（回车保持）：").strip()
+    note = input(f"新备注【{target['note']}】（回车保持）：").strip()
+    try:
+        services.update_members(
+            mid,
+            name = name if name is not None
+            note = note if note is not None
+        )
+        print("已更新。")
+    except ValueError as e:
+        print(f"{e}")
+
+
 def supplement_hours():
     tasks = services.list_tasks()
     if not tasks:
@@ -149,6 +176,7 @@ def member_menu():
         print("\n=====成员管理=====")
         print("1. 添加成员")
         print("2. 查看成员")
+        print("3. 修改成员")
         print("0. 返回")
         choice = input("请选择: ").strip()
         if choice == "1":
@@ -166,6 +194,8 @@ def member_menu():
                 continue
             for m in members:
                 print(f"  {m['id']}. {m['name']}  {m['note']}")
+        elif choice == "3":
+            update_member_dialog()
         elif choice == "0":
             break
         else:

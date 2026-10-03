@@ -9,7 +9,7 @@ def add_member(name, note=""):
         conn.execute("INSERT INTO members (name, note) VALUES (?, ?)", (name, note))
         conn.commit()
     except sqlite3.IntegrityError:
-        raise ValueError(f"成员[{name}]已存在")
+        raise ValueError(f"成员【{name}】已存在。")
     finally:
         conn.close()
 
@@ -19,6 +19,21 @@ def list_members():
     rows = conn.execute("SELECT id, name, note FROM members ORDER BY id").fetchall()
     conn.close()
     return [dict(r) for r in rows]
+
+
+def update_members(member_id, name=None, note=None):
+    conn = get_conn()
+    try:
+        member = conn.execute("SELECT * FROM members WHERE id = ?", (member_id,)).fetchone()
+        if not member:
+            return None
+        new_name = name if name is not None else member['name']
+        new_note = note if note is not None else member['note']
+        try:
+            conn.execute("UPDATE members SET name=?, note=? WHERE id = ?", (new_name, new_note, member_id))
+            conn.commit()
+        except sqlite3.IntegrityError:
+            raise ValueError(f"成员名【{new_name}】已存在。")
 
 
 def add_task(title, description, date, participations):
