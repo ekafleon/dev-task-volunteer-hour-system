@@ -69,6 +69,28 @@ def list_tasks():
     return [dict(r) for r in rows]
 
 
+def update_task(task_id, title=None, description=None, date=None):
+    conn = get_conn()
+    try:
+        task = conn.execute(
+            "SELECT * FROM tasks WHERE id = ?", (task_id,)
+        ).fetchone()
+        if not task:
+            return None
+        new_title = title if title is not None else task["title"]
+        new_desc = description if description is not None else task["description"]
+        new_date = date if date is not None else task["date"]
+        conn.execute(
+            "UPDATE tasks SET title = ?, description = ?, date = ? WHERE id = ?",
+            (new_title, new_desc, new_date, task_id),
+        )
+        conn.commit()
+        return {"id": task_id, "title": new_title,
+                "description": new_desc, "date": new_date}
+    finally:
+        conn.close()
+
+
 def delete_task(task_id):
     conn = get_conn()
     conn.execute("DELETE FROM tasks WHERE id = ?", (task_id,))

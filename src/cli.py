@@ -107,12 +107,49 @@ def update_member_dialog():
     try:
         services.update_members(
             mid,
-            name = name if name is not None
-            note = note if note is not None
+            name=name if name else None,
+            note=note if note else None
         )
         print("已更新。")
     except ValueError as e:
         print(f"{e}")
+
+
+def update_task_dialog():
+    tasks = services.list_tasks()
+    if not tasks:
+        print("暂无任务")
+        return
+    print("\n现有任务：")
+    for t in tasks:
+        print(f"  {t['id']}. {t['date']} {t['title']}")
+    tid = input_int("要修改的任务 ID：", min_value=1)
+    detail = services.get_task_detail(tid)
+    if not detail:
+        print("未找到该任务。")
+        return
+    t = detail["task"]
+    print(f"\n当前信息：")
+    print(f"  标题：{t['title']}")
+    print(f"  描述：{t['description'] or '（无）'}")
+    print(f"  日期：{t['date']}")
+    title = input(f"新标题 [{t['title']}]（回车保持）：").strip()
+    desc = input(f"新描述 [{t['description']}]（回车保持）：").strip()
+    date = input(f"新日期 [{t['date']}]（回车保持）：").strip()
+    if date:
+        try:
+            datetime.strptime(date, "%Y-%m-%d")
+        except ValueError:
+            print("日期格式不对，保持原值。")
+            date = ""
+
+    services.update_task(
+        tid,
+        title=title if title else None,
+        description=desc if desc else None,
+        date=date if date else None,
+    )
+    print("已更新。")
 
 
 def supplement_hours():
@@ -208,8 +245,9 @@ def task_menu():
         print("1. 登记任务")
         print("2. 任务列表")
         print("3. 任务详情")
-        print("4. 删除任务")
-        print("5. 时长补录")
+        print("4. 修改任务")
+        print("5. 删除任务")
+        print("6. 时长补录")
         print("0. 返回")
         choice = input("请选择: ").strip()
         if choice == "1":
@@ -250,10 +288,12 @@ def task_menu():
             for p in detail["participants"]:
                 print(f" - {p['name']}: {p['hours']} 小时")
         elif choice == "4":
+            update_task_dialog()
+        elif choice == "5":
             tid = input_int("任务 ID: ", min_value=1)
             services.delete_task(tid)
             print("已删除")
-        elif choice == "5":
+        elif choice == "6":
             supplement_hours()
         elif choice == "0":
             break
