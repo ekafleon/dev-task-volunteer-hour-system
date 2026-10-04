@@ -4,17 +4,25 @@ from src.db import get_conn
 
 
 def add_member(name, note=""):
+    """
+    添加成员到数据库中
+    :param name: 成员姓名
+    :param note: 成员备注
+    """
     conn = get_conn()
     try:
         conn.execute("INSERT INTO members (name, note) VALUES (?, ?)", (name, note))
         conn.commit()
     except sqlite3.IntegrityError:
-        raise ValueError(f"成员【{name}】已存在。")
+        raise ValueError(f"成员 [{name}] 已存在. ")
     finally:
         conn.close()
 
 
 def list_members():
+    """
+    列出在数据库中的成员
+    """
     conn = get_conn()
     rows = conn.execute("SELECT id, name, note FROM members ORDER BY id").fetchall()
     conn.close()
@@ -22,6 +30,12 @@ def list_members():
 
 
 def update_members(member_id, name=None, note=None):
+    """
+    更新成员在数据库中的信息
+    :param member_id: 成员ID
+    :param name: 成员姓名，可选
+    :param note: 成员备注，可选
+    """
     conn = get_conn()
     try:
         member = conn.execute("SELECT * FROM members WHERE id = ?", (member_id,)).fetchone()
@@ -33,10 +47,17 @@ def update_members(member_id, name=None, note=None):
             conn.execute("UPDATE members SET name=?, note=? WHERE id = ?", (new_name, new_note, member_id))
             conn.commit()
         except sqlite3.IntegrityError:
-            raise ValueError(f"成员名【{new_name}】已存在。")
+            raise ValueError(f"成员名 [{new_name}] 已存在. ")
 
 
 def add_task(title, description, date, participations):
+    """
+    添加任务到数据库中
+    :param title: 任务名称
+    :param description: 任务描述
+    :param date: 任务日期
+    :param participations: 任务的参与者
+    """
     conn = get_conn()
     try:
         cur = conn.execute(
@@ -55,6 +76,9 @@ def add_task(title, description, date, participations):
 
 
 def list_tasks():
+    """
+    列出数据库中的任务
+    """
     conn = get_conn()
     rows = conn.execute("""
         SELECT t.id, t.title, t.date,
@@ -70,6 +94,13 @@ def list_tasks():
 
 
 def update_task(task_id, title=None, description=None, date=None):
+    """
+    更新数据库中的任务
+    :param task_id: 任务ID
+    :param title: 任务标题，可选
+    :param description: 任务描述，可选
+    :param date: 任务日期，可选
+    """
     conn = get_conn()
     try:
         task = conn.execute(
@@ -92,6 +123,10 @@ def update_task(task_id, title=None, description=None, date=None):
 
 
 def delete_task(task_id):
+    """
+    删除任务
+    :param task_id: 任务ID
+    """
     conn = get_conn()
     conn.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
     conn.commit()
@@ -99,6 +134,9 @@ def delete_task(task_id):
 
 
 def summary_all():
+    """
+    列出全体时长信息
+    """
     conn = get_conn()
     rows = conn.execute("""
         SELECT m.id, m.name,
@@ -114,6 +152,10 @@ def summary_all():
 
 
 def summary_member(member_id):
+    """
+    列出某个成员的时长信息
+    :param member_id: 成员ID
+    """
     conn = get_conn()
     member = conn.execute("SELECT * FROM members WHERE id = ?", (member_id,)).fetchone()
     if not member:
@@ -131,6 +173,12 @@ def summary_member(member_id):
 
 
 def upsert_participation(task_id, member_id, hours):
+    """
+    补录时长或成员
+    :param task_id: 任务ID
+    :param member_id: 成员ID
+    :param hours: 要修改的时长
+    """
     conn = get_conn()
     try:
         existing = conn.execute(
