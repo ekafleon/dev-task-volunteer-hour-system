@@ -1,7 +1,11 @@
 # src/services.py
 import sqlite3
 
+import csv
+from pathlib import Path
+
 from src.db import get_conn
+from src.config import BASE_DIR
 
 
 def add_member(name, note=""):
@@ -49,7 +53,9 @@ def update_members(member_id, name=None, note=None):
             conn.commit()
         except sqlite3.IntegrityError:
             raise ValueError(f"成员名 [{new_name}] 已存在. ")
-
+        return {"id": member_id, "name": new_name, "note": new_note}
+    finally:
+        conn.close()
 
 def search_members(keyword):
     """
@@ -59,7 +65,7 @@ def search_members(keyword):
     conn = get_conn()
     rows = conn.execute(
         "SELECT id, name, note FROM members WHERE name LIKE ? ORDER BY id",
-        (f"keyword",),
+        (f"%{keyword}%",),
     ).fetchall()
     conn.close()
     return [dict(r) for r in rows]
@@ -106,6 +112,30 @@ def list_tasks():
     """).fetchall()
     conn.close()
     return [dict(r) for r in rows]
+
+
+def get_task_detail(task_id):
+    """
+    获取任务详情
+    :param task_id: 任务ID
+    """
+    conn = get_conn()
+    task = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
+    if not task:
+        conn.close()
+        return None
+    parts = conn.execute("""
+        SELECT m.name, p.hours
+        FROM participations p
+        JOIN members m ON m.id = p.member_id
+        WHERE p.task_id = ?
+        ORDER BY m.name
+    """, (task_id,)).fetchall()
+    conn.close()
+    return {
+        "task": dict(task),
+        "participants": [dict(p) for p in parts],
+    }
 
 
 def update_task(task_id, title=None, description=None, date=None):
@@ -248,3 +278,41 @@ def upsert_participation(task_id, member_id, hours):
         return action
     finally:
         conn.close()
+
+
+def export_summary_csv(path=None):
+    """
+    导出全体成员时长到csv
+    :param path: 存储csv的路径
+    """
+    if path is None:
+        path = BASE_DIR / "exports" / "summary.csv"
+    else:
+        path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    rows = summary_all()
+    with open(path, "w", newline="", encoding="utf-8-sig") as f:
+        writer = csv.writer(f)
+        writer.writerow(["ID", "姓名", "任务数", "总时长"])
+        for r in rows:
+            writer.writerow([r["id"], r["name"], r["task_count"], r["total_hours"]])
+    return path
+
+
+def export_tasks_csv(path=None):
+    """
+    导出任务列表到csv
+    :param path: 存储csv的路径
+    """
+    if path is None:
+        path = BASE_DIR / "exports" / "tasks.csv"
+    else:
+        path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    rows = list_tasks()
+    with open(path, "w", newline="", encoding="utf-8-sig") as f:
+        writer = csv.writer(f)
+        writer.writerow(["ID", "日期", "任务名称", "人数", " 总时长"])
+        for r in rows:
+            writer.writerow([r["id"], r["date"], r["title"], r["people"], r["total_hours"]])
+    return path

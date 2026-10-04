@@ -168,7 +168,7 @@ def search_task_dialog():
     start = input("起始日期 YYYY-MM-DD (回车跳过) : ").strip()
     end = input("结束日期 YYYY-MM-DD (回车跳过) : ").strip()
 
-    results = services.search_tasks(
+    results = services.search_task(
         keyword=keyword or None,
         start_date=start or None,
         end_date=end or None,
@@ -180,6 +180,18 @@ def search_task_dialog():
     for t in results:
         print(f"  {t['id']}. {t['date']} {t['title']} "
               f"({t['people']}人, {t['total_hours']}h)")
+
+
+def export_summary_dialog():
+    raw = input("导出路径（回车用默认 exports/summary.csv）：").strip()
+    path = services.export_summary_csv(raw if raw else None)
+    print(f"已导出到 {path}")
+
+
+def export_tasks_dialog():
+    raw = input("导出路径（回车用默认 exports/tasks.csv）：").strip()
+    path = services.export_tasks_csv(raw if raw else None)
+    print(f"已导出到 {path}")
 
 
 def supplement_hours():
@@ -244,11 +256,12 @@ def member_menu():
         print("1. 添加成员")
         print("2. 查看成员")
         print("3. 修改成员")
+        print("4. 搜索成员")
         print("0. 返回")
         choice = input("请选择: ").strip()
         if choice == "1":
             name = input_non_empty("姓名: ")
-            note = input("备注").strip()
+            note = input("备注: ").strip()
             try:
                 services.add_member(name, note)
                 print("添加成功")
@@ -263,6 +276,8 @@ def member_menu():
                 print(f"  {m['id']}. {m['name']}  {m['note']}")
         elif choice == "3":
             update_member_dialog()
+        elif choice == "4":
+            search_member_dialog()
         elif choice == "0":
             break
         else:
@@ -278,6 +293,8 @@ def task_menu():
         print("4. 修改任务")
         print("5. 删除任务")
         print("6. 时长补录")
+        print("7. 搜索任务")
+        print("8. 导出任务")
         print("0. 返回")
         choice = input("请选择: ").strip()
         if choice == "1":
@@ -325,6 +342,10 @@ def task_menu():
             print("已删除")
         elif choice == "6":
             supplement_hours()
+        elif choice == "7":
+            search_task_dialog()
+        elif choice == "8":
+            export_tasks_dialog()
         elif choice == "0":
             break
         else:
@@ -336,6 +357,7 @@ def stats_menu():
         print("\n===== 时长统计 =====")
         print("1. 全体汇总")
         print("2. 个人明细")
+        print("3. 导出汇总 CSV")
         print("0. 返回")
         choice = input("请输入: ").strip()
         if choice == "1":
@@ -363,6 +385,8 @@ def stats_menu():
                 total += float(r['hours'])
             print("  " + "-" * 40)
             print(f"总计: {total} 小时")
+        elif choice == "3":
+            export_summary_dialog()
         elif choice == "0":
             break
         else:
