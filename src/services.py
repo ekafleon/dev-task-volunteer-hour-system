@@ -1,5 +1,6 @@
 # src/services.py
 import sqlite3
+
 from src.db import get_conn
 
 
@@ -48,6 +49,20 @@ def update_members(member_id, name=None, note=None):
             conn.commit()
         except sqlite3.IntegrityError:
             raise ValueError(f"成员名 [{new_name}] 已存在. ")
+
+
+def search_members(keyword):
+    """
+    通过关键词模糊搜索成员
+    :param keyword: 关键词
+    """
+    conn = get_conn()
+    rows = conn.execute(
+        "SELECT id, name, note FROM members WHERE name LIKE ? ORDER BY id",
+        (f"keyword",),
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
 
 
 def add_task(title, description, date, participations):
@@ -131,6 +146,38 @@ def delete_task(task_id):
     conn.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
     conn.commit()
     conn.close()
+
+
+def search_task(keyword=None, start_date=None, end_date=None):
+    """
+    按关键词和日期范围搜索任务
+    :param keyword: 关键词
+    :param start_date: 搜索开始日期
+    :param end_date: 搜索结束日期
+    """
+    sql = """
+        SELECT t.id, t.title, t.date,
+               COUNT(p.id) AS people,
+               IFNULL(SUM(p.hours), 0) AS total_hours
+        FROM tasks t
+        LEFT JOIN participations p ON p.task_id = t.id
+        WHERE 1=1
+    """
+    params = []
+    if keyword:
+        sql += " AND t.title LIKE ?"
+        params.append(keyword)
+    if start_date:
+        sql += " AND t.date >= ?"
+        params.append(start_date)
+    if end_date:
+        sql += " AND t.date <= ?"
+        params.append(end_date)
+    sql += " GROUP BY t.id ORDER BY t.date DESC"
+    conn = get_conn()
+    rows = conn.execute(sql, params).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
 
 
 def summary_all():

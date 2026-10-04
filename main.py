@@ -1,12 +1,13 @@
 # -*- coding: utf-8 -*-
 
 import sys
-from src.db import init_db
+
 from src.cli import main_menu
+from src.db import init_db
 
 
 def main():
-    init_db()  # 启动时确保表已建好
+    init_db()
     if "--gui" in sys.argv:
         try:
             from src.gui import launch

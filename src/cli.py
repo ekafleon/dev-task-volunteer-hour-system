@@ -1,5 +1,6 @@
 # src/cli.py
 from datetime import datetime
+
 from src import services
 
 
@@ -51,17 +52,17 @@ def collect_participations(members):
     member_map = {m["id"]: m["name"] for m in members}
     parts = {}
     while True:
-        print("\n当前已添加：")
+        print("\n当前已添加: ")
         if parts:
             for mid, h in parts.items():
-                print(f"  {mid}. {member_map[mid]}：{h} 小时")
+                print(f"  {mid}. {member_map[mid]}: {h} 小时")
         else:
-            print("  （无）")
-        print("\n可选成员：")
+            print("   (无) ")
+        print("\n可选成员: ")
         for m in members:
-            mark = "（已添加）" if m["id"] in parts else ""
+            mark = " (已添加) " if m["id"] in parts else ""
             print(f"  {m['id']}. {m['name']} {mark}")
-        raw = input("成员 ID（逗号分隔，all 表示全部，回车结束）：").strip()
+        raw = input("成员 ID (逗号分隔, all 表示全部, 回车结束) : ").strip()
         if not raw:
             break
         if raw.lower() == "all":
@@ -70,13 +71,13 @@ def collect_participations(members):
             try:
                 member_ids = [int(x.strip()) for x in raw.split(",") if x.strip()]
             except ValueError:
-                print("ID 格式不对，请用逗号分隔数字。")
+                print("ID 格式不对, 请用逗号分隔数字. ")
                 continue
         valid = [mid for mid in member_ids if mid in member_map]
         if not valid:
-            print("没有有效成员。")
+            print("没有有效成员. ")
             continue
-        hours = input_float("统一时长（小时）：", min_value=0.1)
+        hours = input_float("统一时长 (小时) : ", min_value=0.1)
         added, skipped = 0, 0
         for mid in valid:
             if mid in parts:
@@ -84,35 +85,46 @@ def collect_participations(members):
                 continue
             parts[mid] = hours
             added += 1
-        print(f"本批添加 {added} 人，跳过 {skipped} 人（已存在）。")
+        print(f"本批添加 {added} 人, 跳过 {skipped} 人 (已存在) . ")
     return list(parts.items())
 
 
 def update_member_dialog():
     members = services.list_members()
     if not members:
-        print("暂无成员。")
+        print("暂无成员. ")
         return
-    print("\n当前成员：")
+    print("\n当前成员: ")
     for m in members:
         print(f"  {m['id']}. {m['name']}  {m['note']}")
     mid = input_int("要修改的成员id: ", min_value=1)
     target = next((m for m in members if m["id"] == mid), None)
     if not target:
-        print("未找到该成员。")
+        print("未找到该成员. ")
         return
-    print(f"当前信息：姓名【{target['name']}】，备注【{target['note']}】")
-    name = input(f"新姓名【{target['name']}】（回车保持）：").strip()
-    note = input(f"新备注【{target['note']}】（回车保持）：").strip()
+    print(f"当前信息: 姓名【{target['name']}】, 备注【{target['note']}】")
+    name = input(f"新姓名【{target['name']}】 (回车保持) : ").strip()
+    note = input(f"新备注【{target['note']}】 (回车保持) : ").strip()
     try:
         services.update_members(
             mid,
             name=name if name else None,
             note=note if note else None
         )
-        print("已更新。")
+        print("已更新. ")
     except ValueError as e:
         print(f"{e}")
+
+
+def search_member_dialog():
+    keyword = input_non_empty("搜索关键词: ")
+    results = services.search_members(keyword)
+    if not results:
+        print("没有匹配的成员. ")
+        return
+    print(f"\n找到 {len(results)} 位成员: ")
+    for m in results:
+        print(f"  {m['id']}. {m['name']}  {m['note']}")
 
 
 def update_task_dialog():
@@ -120,36 +132,54 @@ def update_task_dialog():
     if not tasks:
         print("暂无任务")
         return
-    print("\n现有任务：")
+    print("\n现有任务: ")
     for t in tasks:
         print(f"  {t['id']}. {t['date']} {t['title']}")
-    tid = input_int("要修改的任务 ID：", min_value=1)
+    tid = input_int("要修改的任务 ID: ", min_value=1)
     detail = services.get_task_detail(tid)
     if not detail:
-        print("未找到该任务。")
+        print("未找到该任务. ")
         return
     t = detail["task"]
-    print(f"\n当前信息：")
-    print(f"  标题：{t['title']}")
-    print(f"  描述：{t['description'] or '（无）'}")
-    print(f"  日期：{t['date']}")
-    title = input(f"新标题 [{t['title']}]（回车保持）：").strip()
-    desc = input(f"新描述 [{t['description']}]（回车保持）：").strip()
-    date = input(f"新日期 [{t['date']}]（回车保持）：").strip()
+    print(f"\n当前信息: ")
+    print(f"  标题: {t['title']}")
+    print(f"  描述: {t['description'] or ' (无) '}")
+    print(f"  日期: {t['date']}")
+    title = input(f"新标题 [{t['title']}] (回车保持) : ").strip()
+    desc = input(f"新描述 [{t['description']}] (回车保持) : ").strip()
+    date = input(f"新日期 [{t['date']}] (回车保持) : ").strip()
     if date:
         try:
             datetime.strptime(date, "%Y-%m-%d")
         except ValueError:
-            print("日期格式不对，保持原值。")
+            print("日期格式不对, 保持原值. ")
             date = ""
-
     services.update_task(
         tid,
         title=title if title else None,
         description=desc if desc else None,
         date=date if date else None,
     )
-    print("已更新。")
+    print("已更新. ")
+
+
+def search_task_dialog():
+    keyword = input("关键词 (回车跳过) : ").strip()
+    start = input("起始日期 YYYY-MM-DD (回车跳过) : ").strip()
+    end = input("结束日期 YYYY-MM-DD (回车跳过) : ").strip()
+
+    results = services.search_tasks(
+        keyword=keyword or None,
+        start_date=start or None,
+        end_date=end or None,
+    )
+    if not results:
+        print("没有匹配的任务. ")
+        return
+    print(f"\n找到 {len(results)} 个任务: ")
+    for t in results:
+        print(f"  {t['id']}. {t['date']} {t['title']} "
+              f"({t['people']}人, {t['total_hours']}h)")
 
 
 def supplement_hours():
@@ -158,30 +188,30 @@ def supplement_hours():
         print("暂无任务")
         return
     print("\n--- 时长补录 ---")
-    print("现有任务：")
+    print("现有任务: ")
     for t in tasks:
         print(f"  {t['id']}. {t['date']} {t['title']}")
-    tid = input_int("任务 ID：", min_value=1)
+    tid = input_int("任务 ID: ", min_value=1)
     detail = services.get_task_detail(tid)
     if not detail:
-        print("未找到该任务。")
+        print("未找到该任务. ")
         return
-    print(f"\n任务「{detail['task']['title']}」当前参与者：")
+    print(f"\n任务「{detail['task']['title']}」当前参与者: ")
     if detail["participants"]:
         for p in detail["participants"]:
-            print(f"  - {p['name']}：{p['hours']} 小时")
+            print(f"  - {p['name']}: {p['hours']} 小时")
     else:
-        print("  （暂无参与者）")
+        print("   (暂无参与者) ")
     members = services.list_members()
     if not members:
-        print("请先添加成员。")
+        print("请先添加成员. ")
         return
-    print("\n所有成员：")
+    print("\n所有成员: ")
     for m in members:
         print(f"  {m['id']}. {m['name']}")
-    raw = input("要补录的成员 ID（逗号分隔，all 表示全部，回车取消）：").strip()
+    raw = input("要补录的成员 ID (逗号分隔, all 表示全部, 回车取消) : ").strip()
     if not raw:
-        print("已取消。")
+        print("已取消. ")
         return
     if raw.lower() == "all":
         member_ids = [m["id"] for m in members]
@@ -189,12 +219,12 @@ def supplement_hours():
         try:
             member_ids = [int(x.strip()) for x in raw.split(",") if x.strip()]
         except ValueError:
-            print("ID 格式不对。")
+            print("ID 格式不对. ")
             return
     if not member_ids:
-        print("没有选择成员。")
+        print("没有选择成员. ")
         return
-    hours = input_float("统一补录时长（小时）：", min_value=0.1)
+    hours = input_float("统一补录时长 (小时) : ", min_value=0.1)
     added, updated, skipped = 0, 0, 0
     for mid in member_ids:
         if not any(m["id"] == mid for m in members):
@@ -205,7 +235,7 @@ def supplement_hours():
             added += 1
         else:
             updated += 1
-    print(f"\n补录完成：新增 {added} 人，更新 {updated} 人，跳过 {skipped} 人（无效 ID）。")
+    print(f"\n补录完成: 新增 {added} 人, 更新 {updated} 人, 跳过 {skipped} 人 (无效 ID) . ")
 
 
 def member_menu():
@@ -260,10 +290,10 @@ def task_menu():
                 continue
             parts = collect_participations(members)
             if not parts:
-                print("没有参与者，任务未保存")
+                print("没有参与者, 任务未保存")
                 continue
             tid = services.add_task(title, desc, date, parts)
-            print(f"已保存, 任务 ID = {tid}，共 {len(parts)} 位参与者")
+            print(f"已保存, 任务 ID = {tid}, 共 {len(parts)} 位参与者")
         elif choice == "2":
             tasks = services.list_tasks()
             if not tasks:
@@ -275,7 +305,7 @@ def task_menu():
                 print(f"{t['id']:<4}{t['date']:<12}{t['title']:<20}"
                       f"{t['people']:<6}{t['total_hours']}")
         elif choice == "3":
-            tid = input_int("任务 ID：", min_value=1)
+            tid = input_int("任务 ID: ", min_value=1)
             detail = services.get_task_detail(tid)
             if not detail:
                 print("未找到")
