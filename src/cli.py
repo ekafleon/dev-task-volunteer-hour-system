@@ -371,6 +371,48 @@ def supplement_hours_dialog():
     c.success(f"补录完成：新增 {added} 人，更新 {updated} 人，跳过 {skipped} 人。")
 
 
+def remove_participation_dialog():
+    tasks = services.list_tasks()
+    if not tasks:
+        c.warn("暂无任务")
+        return
+
+    print(c.bold("\n--- 移除参与记录 ---"))
+    for t in tasks:
+        print(f"  {t['id']}. {t['date']} {t['title']}")
+
+    tid = input_int("任务ID: ", min_value=1)
+    detail = services.get_task_detail(tid)
+    if not detail:
+        c.error("未找到该任务。")
+        return
+
+    if not detail["participants"]:
+        c.warn("该任务暂无参与者")
+        return
+
+    print(f"\n任务「{detail['task']['title']}」当前参与者: ")
+    for p in detail["participants"]:
+        print(f"  - {p['name']}: {p['hours']} 小时")
+
+    members = services.list_members()
+    name = input_non_empty("要移除的成员姓名: ")
+    member = next((m for m in members if m["name"] == name), None)
+    if not member:
+        c.error("未找到该成员。")
+        return
+
+    if not confirm(f"确认移除 「{name}」 在该任务中的记录"):
+        c.warn("已取消。")
+        return
+
+    ok = services.remove_participation(tid, member["id"])
+    if ok:
+        c.success(f"已移除 「{name}」 的参与记录。")
+    else:
+        c.error("移除失败，该成员可能不在此任务中。")
+
+
 def search_task_dialog():
     print(c.bold("\n--- 搜索任务 ---"))
     keyword = input("关键词（回车跳过）：").strip()
@@ -440,6 +482,7 @@ def export_summary_dialog():
 
 # ==================== 系统功能 ====================
 
+
 def backup_dialog():
     print(c.bold("\n--- 备份数据库 ---"))
     path = services.backup_db()
@@ -484,8 +527,9 @@ def task_menu():
         print("4. 修改任务")
         print("5. 删除任务")
         print("6. 时长补录")
-        print("7. 搜索任务")
-        print("8. 导出任务 CSV")
+        print("7. 移除参与记录")
+        print("8. 搜索任务")
+        print("9. 导出任务 CSV")
         print("0. 返回")
         choice = input("请选择: ").strip()
 
@@ -502,8 +546,10 @@ def task_menu():
         elif choice == "6":
             supplement_hours_dialog()
         elif choice == "7":
-            search_task_dialog()
+            remove_participation_dialog()
         elif choice == "8":
+            search_task_dialog()
+        elif choice == "9":
             export_tasks_dialog()
         elif choice == "0":
             break

@@ -278,6 +278,7 @@ def remove_participation(task_id, member_id):
             (task_id, member_id),
         )
         conn.commit()
+        logger.info(f"移除参与记录 task={task_id} member={member_id}")
         return cur.rowcount > 0
     finally:
         conn.close()
