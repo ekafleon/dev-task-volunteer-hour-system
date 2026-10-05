@@ -59,53 +59,50 @@ def confirm(prompt):
 
 # ==================== 通用打印函数 ====================
 
-def print_member_table(members, mark_ids=None):
+def print_member_table(members, mark_ids=None, page_size=15):
     """完整成员表：ID 姓名 小组 备注。"""
     mark_ids = mark_ids or set()
 
-    header = (
-        c.pad("ID", 5) +
-        c.pad("姓名", 14) +
-        c.pad("小组", 14) +
-        c.pad("备注", 20)
-    )
-    print(header)
-    print("-" * 53)
+    headers = [
+        c.pad("ID", 5) + c.pad("姓名", 14) + c.pad("小组", 14) + c.pad("备注", 20),
+        "-" * 53,
+    ]
 
-    for m in members:
+    def row_printer(m):
         group = m['group_name'] or '[未分组]'
         mark = "（已添加）" if m["id"] in mark_ids else ""
-        row = (
+        print(
             c.pad(m["id"], 5) +
             c.pad(m["name"], 14) +
             c.pad(group, 14) +
             c.pad(m["note"], 20) +
             mark
         )
-        print(row)
+
+    c.paginate(members, page_size=page_size,
+               printer=row_printer, headers=headers)
 
 
-def print_member_brief(members):
-    """简略成员列表：ID. 姓名  备注。"""
-    for m in members:
-        print(f"  {m['id']}. {m['name']}  {m['note']}")
-
-
-def print_task_table(tasks):
-    """完整任务表：ID 日期 距今 任务名称 人数 总时长。"""
-    header = (
-        c.pad("ID", 5) +
-        c.pad("日期", 13) +
-        c.pad("距今", 12) +
-        c.pad("任务名称", 22) +
-        c.pad("人数", 8) +
-        c.pad("总时长", 10)
+def print_member_brief(members, page_size=15):
+    """简略成员列表。"""
+    c.paginate(
+        members,
+        page_size=page_size,
+        printer=lambda m: print(f"  {m['id']}. {m['name']}  {m['note']}"),
+        headers=["-" * 40],
     )
-    print(header)
-    print("-" * 70)
 
-    for t in tasks:
-        row = (
+
+def print_task_table(tasks, page_size=15):
+    """完整任务表。"""
+    headers = [
+        c.pad("ID", 5) + c.pad("日期", 13) + c.pad("距今", 12) +
+        c.pad("任务名称", 22) + c.pad("人数", 8) + c.pad("总时长", 10),
+        "-" * 70,
+    ]
+
+    def row_printer(t):
+        print(
             c.pad(t["id"], 5) +
             c.pad(t["date"], 13) +
             c.pad(t["ago"], 12) +
@@ -113,71 +110,77 @@ def print_task_table(tasks):
             c.pad(t["people"], 8) +
             c.pad(t["total_hours"], 10)
         )
-        print(row)
+
+    c.paginate(tasks, page_size=page_size,
+               printer=row_printer, headers=headers)
 
 
-def print_task_brief(tasks, show_stats=False):
-    """简略任务列表：ID. 日期 标题。
-    show_stats=True 时，行末附上（人数, 总时长）。
-    """
-    for t in tasks:
+def print_task_brief(tasks, show_stats=False, page_size=15):
+    """简略任务列表。"""
+    def row_printer(t):
         line = f"  {t['id']}. {t['date']} {t['title']}"
         if show_stats:
             line += f"  ({t['people']}人, {t['total_hours']}h)"
         print(line)
 
+    c.paginate(tasks, page_size=page_size,
+               printer=row_printer, headers=["-" * 40])
 
-def print_summary_table(rows):
-    """汇总表：ID 姓名 任务数 总时长。"""
-    header = (
-        c.pad("ID", 5) +
-        c.pad("姓名", 14) +
-        c.pad("任务数", 10) +
-        c.pad("总时长", 12)
-    )
-    print(header)
-    print("-" * 41)
 
-    for r in rows:
-        row = (
+def print_summary_table(rows, page_size=15):
+    """汇总表。"""
+    headers = [
+        c.pad("ID", 5) + c.pad("姓名", 14) + c.pad("任务数", 10) + c.pad("总时长", 12),
+        "-" * 41,
+    ]
+
+    def row_printer(r):
+        print(
             c.pad(r["id"], 5) +
             c.pad(r["name"], 14) +
             c.pad(r["task_count"], 10) +
             c.pad(str(r["total_hours"]) + " 小时", 12)
         )
-        print(row)
+
+    c.paginate(rows, page_size=page_size,
+               printer=row_printer, headers=headers)
 
 
-def print_group_list(groups):
-    """小组编号列表。"""
-    for i, g in enumerate(groups, 1):
-        print(f"  {i}. {g}")
-    print(f"  {len(groups) + 1}. （未分组）")
-
-
-def print_month_table(rows):
+def print_month_table(rows, page_size=15):
     """按月统计表。"""
-    header = c.pad("月份", 12) + c.pad("任务数", 10) + c.pad("总时长", 12)
-    print(header)
-    print("-" * 34)
-    for r in rows:
-        row = (c.pad(r["month"], 12) +
-               c.pad(r["task_count"], 10) +
-               c.pad(str(r["total_hours"]) + " 小时", 12))
-        print(row)
+    headers = [
+        c.pad("月份", 12) + c.pad("任务数", 10) + c.pad("总时长", 12),
+        "-" * 34,
+    ]
+
+    def row_printer(r):
+        print(
+            c.pad(r["month"], 12) +
+            c.pad(r["task_count"], 10) +
+            c.pad(str(r["total_hours"]) + " 小时", 12)
+        )
+
+    c.paginate(rows, page_size=page_size,
+               printer=row_printer, headers=headers)
 
 
-def print_group_summary_table(rows):
+def print_group_summary_table(rows, page_size=15):
     """按小组统计表。"""
-    header = c.pad("小组", 16) + c.pad("人数", 10) + c.pad("总时长", 12)
-    print(header)
-    print("-" * 38)
-    for r in rows:
+    headers = [
+        c.pad("小组", 16) + c.pad("人数", 10) + c.pad("总时长", 12),
+        "-" * 38,
+    ]
+
+    def row_printer(r):
         group = r["group_name"] or "(未分组)"
-        row = (c.pad(group, 16) +
-               c.pad(r["member_count"], 10) +
-               c.pad(str(r["total_hours"]) + " 小时", 12))
-        print(row)
+        print(
+            c.pad(group, 16) +
+            c.pad(r["member_count"], 10) +
+            c.pad(str(r["total_hours"]) + " 小时", 12)
+        )
+
+    c.paginate(rows, page_size=page_size,
+               printer=row_printer, headers=headers)
 
 
 # ==================== 成员功能 ====================
@@ -190,23 +193,28 @@ def add_member_dialog():
     try:
         services.add_member(name, note, group)
         c.success("添加成功")
+        c.pause()
     except ValueError as e:
         c.error(f"{e}")
+        c.pause()
 
 
 def list_members_dialog():
     members = services.list_members()
     if not members:
         c.warn("暂无成员")
+        c.pause()
         return
     print(c.bold("\n--- 成员列表 ---"))
     print_member_table(members)
+    c.pause()
 
 
 def update_member_dialog():
     members = services.list_members()
     if not members:
         c.warn("暂无成员")
+        c.pause()
         return
 
     print(c.bold("\n--- 修改成员 ---"))
@@ -216,6 +224,7 @@ def update_member_dialog():
     target = next((m for m in members if m["id"] == mid), None)
     if not target:
         c.error("未找到该成员。")
+        c.pause()
         return
 
     print(f"\n当前：姓名「{target['name']}」，小组「{target['group_name'] or '未分组'}」，备注「{target['note']}」")
@@ -231,14 +240,17 @@ def update_member_dialog():
             group_name=group if group else None,
         )
         c.success("已更新。")
+        c.pause()
     except ValueError as e:
         c.error(f"{e}")
+        c.pause()
 
 
 def delete_member_dialog():
     members = services.list_members()
     if not members:
         c.warn("暂无成员")
+        c.pause()
         return
 
     print(c.bold("\n--- 删除成员 ---"))
@@ -247,6 +259,7 @@ def delete_member_dialog():
     mid = input_int("要删除的成员 ID：", min_value=1)
     if not confirm("确认删除？该成员的所有参与记录也会被删除"):
         c.warn("已取消。")
+        c.pause()
         return
 
     result = services.delete_member(mid)
@@ -254,6 +267,7 @@ def delete_member_dialog():
         c.error("未找到该成员。")
     else:
         c.success(f"已删除「{result['name']}」，同时移除 {result['removed_records']} 条参与记录。")
+    c.pause()
 
 
 def search_member_dialog():
@@ -262,15 +276,18 @@ def search_member_dialog():
     results = services.search_members(keyword)
     if not results:
         c.warn("没有匹配的成员。")
+        c.pause()
         return
     print(f"\n找到 {len(results)} 位成员：")
     print_member_brief(results)
+    c.pause()
 
 
 def members_by_group_dialog():
     groups = services.list_groups()
     if not groups:
         c.warn("暂无小组。可以先去修改成员信息，给成员设置小组。")
+        c.pause()
         return
 
     print(c.bold("\n--- 按小组查看成员 ---"))
@@ -286,15 +303,18 @@ def members_by_group_dialog():
         label = group_name
     else:
         c.warn("编号超出范围。")
+        c.pause()
         return
 
     members = services.list_members_by_group(group_name)
     if not members:
         c.warn(f"「{label}」下暂无成员。")
+        c.pause()
         return
 
     print(c.bold(f"\n--- 小组「{label}」成员 ---"))
     print_member_brief(members)
+    c.pause()
 
 
 # ==================== 任务功能 ====================
@@ -313,7 +333,8 @@ def collect_participations(members):
             print("  （无）")
 
         print(c.bold("\n可选成员："))
-        print_member_table(members, mark_ids=set(parts.keys()))
+        # 交互循环内禁用分页
+        print_member_table(members, mark_ids=set(parts.keys()), page_size=9999)
 
         raw = input("成员 ID（逗号分隔，all 表示全部，回车结束）：").strip()
         if not raw:
@@ -356,24 +377,29 @@ def add_task_dialog():
     members = services.list_members()
     if not members:
         c.warn("请先添加成员")
+        c.pause()
         return
 
     parts = collect_participations(members)
     if not parts:
         c.warn("没有参与者，任务未保存")
+        c.pause()
         return
 
     tid = services.add_task(title, desc, date, parts)
     c.success(f"已保存, 任务 ID = {tid}，共 {len(parts)} 位参与者")
+    c.pause()
 
 
 def list_tasks_dialog():
     tasks = services.list_tasks()
     if not tasks:
         c.warn("(暂无任务)")
+        c.pause()
         return
     print(c.bold("\n--- 任务列表 ---"))
     print_task_table(tasks)
+    c.pause()
 
 
 def show_task_detail_dialog():
@@ -381,6 +407,7 @@ def show_task_detail_dialog():
     detail = services.get_task_detail(tid)
     if not detail:
         c.error("未找到")
+        c.pause()
         return
 
     t = detail["task"]
@@ -391,12 +418,14 @@ def show_task_detail_dialog():
     print("参与者: ")
     for p in detail["participants"]:
         print(f" - {p['name']}: {p['hours']} 小时")
+    c.pause()
 
 
 def update_task_dialog():
     tasks = services.list_tasks()
     if not tasks:
         c.warn("暂无任务")
+        c.pause()
         return
 
     print(c.bold("\n--- 修改任务 ---"))
@@ -406,6 +435,7 @@ def update_task_dialog():
     detail = services.get_task_detail(tid)
     if not detail:
         c.error("未找到该任务。")
+        c.pause()
         return
 
     t = detail["task"]
@@ -432,12 +462,14 @@ def update_task_dialog():
         date=date if date else None,
     )
     c.success("已更新。")
+    c.pause()
 
 
 def delete_task_dialog():
     tasks = services.list_tasks()
     if not tasks:
         c.warn("暂无任务")
+        c.pause()
         return
 
     print(c.bold("\n--- 删除任务 ---"))
@@ -446,16 +478,19 @@ def delete_task_dialog():
     tid = input_int("要删除的任务 ID：", min_value=1)
     if not confirm("确认删除该任务及其所有参与记录"):
         c.warn("已取消。")
+        c.pause()
         return
 
     services.delete_task(tid)
     c.success("已删除")
+    c.pause()
 
 
 def supplement_hours_dialog():
     tasks = services.list_tasks()
     if not tasks:
         c.warn("暂无任务")
+        c.pause()
         return
 
     print(c.bold("\n--- 时长补录 ---"))
@@ -465,6 +500,7 @@ def supplement_hours_dialog():
     detail = services.get_task_detail(tid)
     if not detail:
         c.error("未找到该任务。")
+        c.pause()
         return
 
     print(f"\n任务「{detail['task']['title']}」当前参与者：")
@@ -477,14 +513,17 @@ def supplement_hours_dialog():
     members = services.list_members()
     if not members:
         c.warn("请先添加成员。")
+        c.pause()
         return
 
     print(c.bold("\n所有成员："))
-    print_member_brief(members)
+    # 交互流程禁用分页
+    print_member_brief(members, page_size=9999)
 
     raw = input("要补录的成员 ID（逗号分隔，all 表示全部，回车取消）：").strip()
     if not raw:
         c.warn("已取消。")
+        c.pause()
         return
 
     if raw.lower() == "all":
@@ -494,6 +533,7 @@ def supplement_hours_dialog():
             member_ids = [int(x.strip()) for x in raw.split(",") if x.strip()]
         except ValueError:
             c.warn("ID 格式不对。")
+            c.pause()
             return
 
     hours = input_float("统一补录时长（小时）：", min_value=0.1)
@@ -511,12 +551,14 @@ def supplement_hours_dialog():
             updated += 1
 
     c.success(f"补录完成：新增 {added} 人，更新 {updated} 人，跳过 {skipped} 人。")
+    c.pause()
 
 
 def remove_participation_dialog():
     tasks = services.list_tasks()
     if not tasks:
         c.warn("暂无任务")
+        c.pause()
         return
 
     print(c.bold("\n--- 移除参与记录 ---"))
@@ -526,10 +568,12 @@ def remove_participation_dialog():
     detail = services.get_task_detail(tid)
     if not detail:
         c.error("未找到该任务。")
+        c.pause()
         return
 
     if not detail["participants"]:
         c.warn("该任务暂无参与者")
+        c.pause()
         return
 
     print(f"\n任务「{detail['task']['title']}」当前参与者: ")
@@ -541,10 +585,12 @@ def remove_participation_dialog():
     member = next((m for m in members if m["name"] == name), None)
     if not member:
         c.error("未找到该成员。")
+        c.pause()
         return
 
     if not confirm(f"确认移除 「{name}」 在该任务中的记录"):
         c.warn("已取消。")
+        c.pause()
         return
 
     ok = services.remove_participation(tid, member["id"])
@@ -552,6 +598,7 @@ def remove_participation_dialog():
         c.success(f"已移除 「{name}」 的参与记录。")
     else:
         c.error("移除失败，该成员可能不在此任务中。")
+    c.pause()
 
 
 def search_task_dialog():
@@ -567,9 +614,11 @@ def search_task_dialog():
     )
     if not results:
         c.warn("没有匹配的任务。")
+        c.pause()
         return
     print(f"\n找到 {len(results)} 个任务：")
     print_task_brief(results, show_stats=True)
+    c.pause()
 
 
 def export_tasks_dialog():
@@ -577,6 +626,7 @@ def export_tasks_dialog():
     raw = input("导出路径（回车用默认 exports/tasks.csv）：").strip()
     path = services.export_tasks_csv(raw if raw else None)
     c.success(f"已导出到 {path}")
+    c.pause()
 
 
 # ==================== 统计功能 ====================
@@ -585,9 +635,11 @@ def summary_all_dialog():
     rows = services.summary_all()
     if not rows:
         c.warn("(暂无成员)")
+        c.pause()
         return
     print(c.bold("\n--- 全体成员汇总 ---"))
     print_summary_table(rows)
+    c.pause()
 
 
 def summary_member_dialog():
@@ -595,11 +647,13 @@ def summary_member_dialog():
     data = services.summary_member(mid)
     if not data:
         c.error("未找到")
+        c.pause()
         return
 
     print(c.bold(f"\n--- {data['member']['name']} 的志愿时长明细 ---"))
     if not data['records']:
         c.warn("无参与记录")
+        c.pause()
         return
 
     total = 0.0
@@ -608,6 +662,7 @@ def summary_member_dialog():
         total += float(r['hours'])
     print("  " + "-" * 40)
     c.success(f"总计: {total} 小时")
+    c.pause()
 
 
 def export_summary_dialog():
@@ -615,30 +670,36 @@ def export_summary_dialog():
     raw = input("导出路径（回车用默认 exports/summary.csv）：").strip()
     path = services.export_summary_csv(raw if raw else None)
     c.success(f"已导出到 {path}")
+    c.pause()
 
 
 def summary_by_month_dialog():
     rows = services.summary_by_month()
     if not rows:
         c.warn("暂无数据")
+        c.pause()
         return
     print(c.bold("\n--- 按月统计 ---"))
     print_month_table(rows)
+    c.pause()
 
 
 def summary_by_group_dialog():
     rows = services.summary_by_group()
     if not rows:
         c.warn("暂无数据")
+        c.pause()
         return
     print(c.bold("\n--- 按小组统计 ---"))
     print_group_summary_table(rows)
+    c.pause()
 
 
 def never_participated_dialog():
     rows = services.never_participated()
     if not rows:
         c.success("所有成员都参与过任务。")
+        c.pause()
         return
     print(c.bold("\n--- 从未参与的成员 ---"))
     print(f"{c.pad('ID', 5)}{c.pad('姓名', 14)}{c.pad('小组', 14)}")
@@ -646,6 +707,7 @@ def never_participated_dialog():
     for r in rows:
         group = r["group_name"] or "(未分组)"
         print(f"{c.pad(r['id'], 5)}{c.pad(r['name'], 14)}{c.pad(group, 14)}")
+    c.pause()
 
 
 def top_members_dialog():
@@ -656,6 +718,7 @@ def top_members_dialog():
     rows = services.top_members(n)
     if not rows:
         c.warn("暂无数据")
+        c.pause()
         return
 
     print(f"\nTop {n}：")
@@ -666,6 +729,7 @@ def top_members_dialog():
         print(f"{c.pad(i, 6)}{c.pad(r['name'], 14)}"
               f"{c.pad(r['task_count'], 10)}"
               f"{c.pad(str(r['total_hours']) + ' 小时', 12)}")
+    c.pause()
 
 
 # ==================== 系统功能 ====================
@@ -674,12 +738,14 @@ def backup_dialog():
     print(c.bold("\n--- 备份数据库 ---"))
     path = services.backup_db()
     c.success(f"已备份到 {path}")
+    c.pause()
 
 
 # ==================== 菜单 ====================
 
 def member_menu():
     while True:
+        c.clear()
         print(c.bold("\n===== 成员管理 ====="))
         print("1. 添加成员")
         print("2. 查看成员")
@@ -710,6 +776,7 @@ def member_menu():
 
 def task_menu():
     while True:
+        c.clear()
         print(c.bold("\n===== 任务管理 ====="))
         print("1. 登记任务")
         print("2. 任务列表")
@@ -749,6 +816,7 @@ def task_menu():
 
 def stats_menu():
     while True:
+        c.clear()
         print(c.bold("\n===== 时长统计 ====="))
         print("1. 全体汇总")
         print("2. 个人明细")
@@ -782,6 +850,7 @@ def stats_menu():
 
 def system_menu():
     while True:
+        c.clear()
         print(c.bold("\n===== 系统工具 ====="))
         print("1. 备份数据库")
         print("0. 返回")
@@ -800,6 +869,7 @@ def main_menu():
     print(c.bold("  开发组任务登记及志愿时长分配系统 v1.0"))
     print(c.bold("========================================"))
     while True:
+        c.clear()
         print(c.bold("\n===== 主菜单 ====="))
         print("1. 成员管理")
         print("2. 任务管理")
