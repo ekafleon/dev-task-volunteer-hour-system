@@ -438,6 +438,13 @@ def export_summary_dialog():
     path = services.export_summary_csv(raw if raw else None)
     c.success(f"已导出到 {path}")
 
+# ==================== 系统功能 ====================
+
+def backup_dialog():
+    print(c.bold("\n--- 备份数据库 ---"))
+    path = services.backup_db()
+    c.success(f"已备份到 {path}")
+
 
 # ==================== 菜单 ====================
 
@@ -525,6 +532,21 @@ def stats_menu():
             c.warn("无效选项")
 
 
+def system_menu():
+    while True:
+        print(c.bold("\n===== 系统工具 ====="))
+        print("1. 备份数据库")
+        print("0. 返回")
+        choice = input("请选: ").strip()
+
+        if choice == "1":
+            backup_dialog()
+        elif choice == "0":
+            break
+        else:
+            c.warn("无效选项")
+
+
 def main_menu():
     print(c.bold("========================================"))
     print(c.bold("  开发组任务登记及志愿时长分配系统 v1.0"))
@@ -534,6 +556,7 @@ def main_menu():
         print("1. 成员管理")
         print("2. 任务管理")
         print("3. 时长统计")
+        print("4. 系统工具")
         print("0. 退出")
         choice = input("请选择: ").strip()
 
@@ -543,6 +566,8 @@ def main_menu():
             task_menu()
         elif choice == "3":
             stats_menu()
+        elif choice == "4":
+            system_menu()
         elif choice == "0":
             c.success("再见!")
             break

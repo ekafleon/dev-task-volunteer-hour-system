@@ -1,12 +1,13 @@
 # src/services.py
 
 import csv
+import shutil
 import sqlite3
 from datetime import datetime
 from pathlib import Path
 
 from src.db import get_conn
-from src.config import BASE_DIR
+from src.config import BASE_DIR, DB_PATH
 
 
 # ==================== 成员 ====================
@@ -371,4 +372,14 @@ def export_tasks_csv(path=None):
         for r in rows:
             writer.writerow([r["id"], r["date"], r["title"],
                              r["people"], r["total_hours"]])
+    return path
+
+
+def backup_db():
+    """备份数据库到 backups/ 目录。返回备份文件路径。"""
+    backup_dir = BASE_DIR / "backups"
+    backup_dir.mkdir(parents=True, exist_ok=True)
+    name = f"backup_{datetime.now():%Y%m%d_%H%M%S}.db"
+    path = backup_dir / name
+    shutil.copy(DB_PATH, path)
     return path
