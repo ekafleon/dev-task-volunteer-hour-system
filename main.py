@@ -1,16 +1,84 @@
+# main.py
 # -*- coding: utf-8 -*-
 
+import argparse
 import sys
 
 from src.db import init_db
-from src.cli import main_menu
 from src.logger import logger
 
+
+def build_parser():
+    parser = argparse.ArgumentParser(
+        description="开发组任务登记及志愿时长分配系统"
+    )
+    parser.add_argument("--cli", action="store_true", help="启动菜单")
+
+    sub = parser.add_subparsers(dest="cmd")
+
+    sub.add_parser("summary", help="打印全体成员汇总")
+    sub.add_parser("list-members", help="列出成员")
+    sub.add_parser("list-tasks", help="列出任务")
+    sub.add_parser("backup", help="备份数据库")
+    sub.add_parser("export-summary", help="导出汇总 CSV")
+
+    p = sub.add_parser("add-member", help="添加成员")
+    p.add_argument("--name", required=True)
+    p.add_argument("--note", default="")
+    p.add_argument("--group", default="")
+
+    return parser
+
+
+def run_command(args):
+    from src import services
+
+    if args.cmd == "summary":
+        for r in services.summary_all():
+            print(f"{r['id']}\t{r['name']}\t{r['task_count']}\t{r['total_hours']}")
+
+    elif args.cmd == "add-member":
+        try:
+            services.add_member(args.name, args.note, args.group)
+            print(f"已添加 {args.name}")
+        except ValueError as e:
+            print(f"错误：{e}")
+            sys.exit(1)
+
+    elif args.cmd == "list-members":
+        for m in services.list_members():
+            print(f"{m['id']}\t{m['name']}\t{m['group_name']}\t{m['note']}")
+
+    elif args.cmd == "list-tasks":
+        for t in services.list_tasks():
+            print(f"{t['id']}\t{t['date']}\t{t['title']}\t"
+                  f"{t['people']}\t{t['total_hours']}")
+
+    elif args.cmd == "backup":
+        path = services.backup_db()
+        print(f"已备份到 {path}")
+
+    elif args.cmd == "export-summary":
+        path = services.export_summary_csv()
+        print(f"已导出到 {path}")
+
+    else:
+        return False
+    return True
 
 
 def main():
     init_db()
-    main_menu()
+    parser = build_parser()
+    args = parser.parse_args()
+
+    if args.cmd:
+        run_command(args)
+        return
+
+    else:
+        from src.cli import main_menu
+        main_menu()
 
 
 if __name__ == "__main__":
@@ -20,4 +88,4 @@ if __name__ == "__main__":
         print("\n已退出")
     except Exception as e:
         logger.exception("未处理异常")
-        print(f"出错了: {e}")
+        print(f"出错了：{e}")

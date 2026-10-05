@@ -84,7 +84,7 @@ def delete_member(member_id):
 
         conn.execute("DELETE FROM members WHERE id = ?", (member_id,))
         conn.commit()
-        logger.info(f"删除成员 {member["name"]}, 移除 {cnt} 条参与记录")
+        logger.info(f"删除成员 {member['name']}, 移除 {cnt} 条参与记录")
         return {"name": member["name"], "removed_records": cnt}
     finally:
         conn.close()
@@ -420,3 +420,54 @@ def backup_db():
     shutil.copy(DB_PATH, path)
     logger.info(f"备份数据库到 {path}")
     return path
+
+
+def summary_by_month():
+    """按月统计：月份、任务数、总时长。"""
+    conn = get_conn()
+    rows = conn.execute("""
+        SELECT substr(t.date, 1, 7) AS month,
+               COUNT(DISTINCT t.id) AS task_count,
+               IFNULL(SUM(p.hours), 0) AS total_hours
+        FROM tasks t
+        LEFT JOIN participations p ON p.task_id = t.id
+        GROUP BY month
+        ORDER BY month DESC
+    """).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def summary_by_group():
+    """按小组统计：小组、人数、总时长。"""
+    conn = get_conn()
+    rows = conn.execute("""
+        SELECT m.group_name,
+               COUNT(DISTINCT m.id) AS member_count,
+               IFNULL(SUM(p.hours), 0) AS total_hours
+        FROM members m
+        LEFT JOIN participations p ON p.member_id = m.id
+        GROUP BY m.group_name
+        ORDER BY total_hours DESC
+    """).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def never_participated():
+    """从未参与任何任务的成员。"""
+    conn = get_conn()
+    rows = conn.execute("""
+        SELECT m.id, m.name, m.group_name
+        FROM members m
+        LEFT JOIN participations p ON p.member_id = m.id
+        WHERE p.id IS NULL
+        ORDER BY m.id
+    """).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def top_members(n=10):
+    """时长排行榜前 n 名。"""
+    return summary_all()[:n]

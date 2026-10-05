@@ -155,6 +155,31 @@ def print_group_list(groups):
     print(f"  {len(groups) + 1}. （未分组）")
 
 
+def print_month_table(rows):
+    """按月统计表。"""
+    header = c.pad("月份", 12) + c.pad("任务数", 10) + c.pad("总时长", 12)
+    print(header)
+    print("-" * 34)
+    for r in rows:
+        row = (c.pad(r["month"], 12) +
+               c.pad(r["task_count"], 10) +
+               c.pad(str(r["total_hours"]) + " 小时", 12))
+        print(row)
+
+
+def print_group_summary_table(rows):
+    """按小组统计表。"""
+    header = c.pad("小组", 16) + c.pad("人数", 10) + c.pad("总时长", 12)
+    print(header)
+    print("-" * 38)
+    for r in rows:
+        group = r["group_name"] or "(未分组)"
+        row = (c.pad(group, 16) +
+               c.pad(r["member_count"], 10) +
+               c.pad(str(r["total_hours"]) + " 小时", 12))
+        print(row)
+
+
 # ==================== 成员功能 ====================
 
 def add_member_dialog():
@@ -592,6 +617,57 @@ def export_summary_dialog():
     c.success(f"已导出到 {path}")
 
 
+def summary_by_month_dialog():
+    rows = services.summary_by_month()
+    if not rows:
+        c.warn("暂无数据")
+        return
+    print(c.bold("\n--- 按月统计 ---"))
+    print_month_table(rows)
+
+
+def summary_by_group_dialog():
+    rows = services.summary_by_group()
+    if not rows:
+        c.warn("暂无数据")
+        return
+    print(c.bold("\n--- 按小组统计 ---"))
+    print_group_summary_table(rows)
+
+
+def never_participated_dialog():
+    rows = services.never_participated()
+    if not rows:
+        c.success("所有成员都参与过任务。")
+        return
+    print(c.bold("\n--- 从未参与的成员 ---"))
+    print(f"{c.pad('ID', 5)}{c.pad('姓名', 14)}{c.pad('小组', 14)}")
+    print("-" * 33)
+    for r in rows:
+        group = r["group_name"] or "(未分组)"
+        print(f"{c.pad(r['id'], 5)}{c.pad(r['name'], 14)}{c.pad(group, 14)}")
+
+
+def top_members_dialog():
+    print(c.bold("\n--- 时长排行榜 ---"))
+    raw = input("显示前几名（默认 10）：").strip()
+    n = int(raw) if raw.isdigit() and int(raw) > 0 else 10
+
+    rows = services.top_members(n)
+    if not rows:
+        c.warn("暂无数据")
+        return
+
+    print(f"\nTop {n}：")
+    print(f"{c.pad('排名', 6)}{c.pad('姓名', 14)}"
+          f"{c.pad('任务数', 10)}{c.pad('总时长', 12)}")
+    print("-" * 42)
+    for i, r in enumerate(rows, 1):
+        print(f"{c.pad(i, 6)}{c.pad(r['name'], 14)}"
+              f"{c.pad(r['task_count'], 10)}"
+              f"{c.pad(str(r['total_hours']) + ' 小时', 12)}")
+
+
 # ==================== 系统功能 ====================
 
 def backup_dialog():
@@ -676,7 +752,11 @@ def stats_menu():
         print(c.bold("\n===== 时长统计 ====="))
         print("1. 全体汇总")
         print("2. 个人明细")
-        print("3. 导出汇总 CSV")
+        print("3. 按月统计")
+        print("4. 按小组统计")
+        print("5. 从未参与过的成员")
+        print("6. 时长排行榜")
+        print("7. 导出汇总 CSV")
         print("0. 返回")
         choice = input("请输入: ").strip()
 
@@ -685,6 +765,14 @@ def stats_menu():
         elif choice == "2":
             summary_member_dialog()
         elif choice == "3":
+            summary_by_month_dialog()
+        elif choice == "4":
+            summary_by_group_dialog()
+        elif choice == "5":
+            never_participated_dialog()
+        elif choice == "6":
+            top_members_dialog()
+        elif choice == "7":
             export_summary_dialog()
         elif choice == "0":
             break
