@@ -1,67 +1,85 @@
 # src/services.py
-import sqlite3
 
 import csv
+import sqlite3
+from datetime import datetime
 from pathlib import Path
 
 from src.db import get_conn
 from src.config import BASE_DIR
 
 
+# ==================== 成员 ====================
+
 def add_member(name, note=""):
-    """
-    添加成员到数据库中
-    :param name: 成员姓名
-    :param note: 成员备注
-    """
     conn = get_conn()
     try:
         conn.execute("INSERT INTO members (name, note) VALUES (?, ?)", (name, note))
         conn.commit()
     except sqlite3.IntegrityError:
-        raise ValueError(f"成员 [{name}] 已存在. ")
+        raise ValueError(f"成员「{name}」已存在")
     finally:
         conn.close()
 
 
 def list_members():
-    """
-    列出在数据库中的成员
-    """
     conn = get_conn()
     rows = conn.execute("SELECT id, name, note FROM members ORDER BY id").fetchall()
     conn.close()
     return [dict(r) for r in rows]
 
 
-def update_members(member_id, name=None, note=None):
-    """
-    更新成员在数据库中的信息
-    :param member_id: 成员ID
-    :param name: 成员姓名，可选
-    :param note: 成员备注，可选
-    """
+def update_member(member_id, name=None, note=None):
+    """修改成员。参数为 None 时保持原值。找不到返回 None。"""
     conn = get_conn()
     try:
-        member = conn.execute("SELECT * FROM members WHERE id = ?", (member_id,)).fetchone()
+        member = conn.execute(
+            "SELECT * FROM members WHERE id = ?", (member_id,)
+        ).fetchone()
         if not member:
             return None
-        new_name = name if name is not None else member['name']
-        new_note = note if note is not None else member['note']
+
+        new_name = name if name is not None else member["name"]
+        new_note = note if note is not None else member["note"]
+
         try:
-            conn.execute("UPDATE members SET name=?, note=? WHERE id = ?", (new_name, new_note, member_id))
+            conn.execute(
+                "UPDATE members SET name = ?, note = ? WHERE id = ?",
+                (new_name, new_note, member_id),
+            )
             conn.commit()
         except sqlite3.IntegrityError:
-            raise ValueError(f"成员名 [{new_name}] 已存在. ")
+            raise ValueError(f"成员名「{new_name}」已存在")
+
         return {"id": member_id, "name": new_name, "note": new_note}
     finally:
         conn.close()
 
+
+def delete_member(member_id):
+    """删除成员，级联删除参与记录。返回信息或 None。"""
+    conn = get_conn()
+    try:
+        member = conn.execute(
+            "SELECT name FROM members WHERE id = ?", (member_id,)
+        ).fetchone()
+        if not member:
+            return None
+
+        cnt = conn.execute(
+            "SELECT COUNT(*) AS c FROM participations WHERE member_id = ?",
+            (member_id,),
+        ).fetchone()["c"]
+
+        conn.execute("DELETE FROM members WHERE id = ?", (member_id,))
+        conn.commit()
+        return {"name": member["name"], "removed_records": cnt}
+    finally:
+        conn.close()
+
+
 def search_members(keyword):
-    """
-    通过关键词模糊搜索成员
-    :param keyword: 关键词
-    """
+    """按姓名模糊搜索。"""
     conn = get_conn()
     rows = conn.execute(
         "SELECT id, name, note FROM members WHERE name LIKE ? ORDER BY id",
@@ -71,14 +89,10 @@ def search_members(keyword):
     return [dict(r) for r in rows]
 
 
+# ==================== 任务 ====================
+
 def add_task(title, description, date, participations):
-    """
-    添加任务到数据库中
-    :param title: 任务名称
-    :param description: 任务描述
-    :param date: 任务日期
-    :param participations: 任务的参与者
-    """
+    """participations: [(member_id, hours), ...]"""
     conn = get_conn()
     try:
         cur = conn.execute(
@@ -88,7 +102,7 @@ def add_task(title, description, date, participations):
         task_id = cur.lastrowid
         conn.executemany(
             "INSERT INTO participations (task_id, member_id, hours) VALUES (?, ?, ?)",
-            [(task_id, mid, h) for mid, h in participations]
+            [(task_id, mid, h) for mid, h in participations],
         )
         conn.commit()
         return task_id
@@ -97,9 +111,6 @@ def add_task(title, description, date, participations):
 
 
 def list_tasks():
-    """
-    列出数据库中的任务
-    """
     conn = get_conn()
     rows = conn.execute("""
         SELECT t.id, t.title, t.date,
@@ -111,19 +122,22 @@ def list_tasks():
         ORDER BY t.date DESC, t.id DESC
     """).fetchall()
     conn.close()
-    return [dict(r) for r in rows]
+
+    result = []
+    for r in rows:
+        item = dict(r)
+        item["ago"] = humanize_date(item["date"])
+        result.append(item)
+    return result
 
 
 def get_task_detail(task_id):
-    """
-    获取任务详情
-    :param task_id: 任务ID
-    """
     conn = get_conn()
     task = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
     if not task:
         conn.close()
         return None
+
     parts = conn.execute("""
         SELECT m.name, p.hours
         FROM participations p
@@ -132,30 +146,20 @@ def get_task_detail(task_id):
         ORDER BY m.name
     """, (task_id,)).fetchall()
     conn.close()
-    return {
-        "task": dict(task),
-        "participants": [dict(p) for p in parts],
-    }
+    return {"task": dict(task), "participants": [dict(p) for p in parts]}
 
 
 def update_task(task_id, title=None, description=None, date=None):
-    """
-    更新数据库中的任务
-    :param task_id: 任务ID
-    :param title: 任务标题，可选
-    :param description: 任务描述，可选
-    :param date: 任务日期，可选
-    """
     conn = get_conn()
     try:
-        task = conn.execute(
-            "SELECT * FROM tasks WHERE id = ?", (task_id,)
-        ).fetchone()
+        task = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
         if not task:
             return None
+
         new_title = title if title is not None else task["title"]
         new_desc = description if description is not None else task["description"]
         new_date = date if date is not None else task["date"]
+
         conn.execute(
             "UPDATE tasks SET title = ?, description = ?, date = ? WHERE id = ?",
             (new_title, new_desc, new_date, task_id),
@@ -168,23 +172,13 @@ def update_task(task_id, title=None, description=None, date=None):
 
 
 def delete_task(task_id):
-    """
-    删除任务
-    :param task_id: 任务ID
-    """
     conn = get_conn()
     conn.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
     conn.commit()
     conn.close()
 
 
-def search_task(keyword=None, start_date=None, end_date=None):
-    """
-    按关键词和日期范围搜索任务
-    :param keyword: 关键词
-    :param start_date: 搜索开始日期
-    :param end_date: 搜索结束日期
-    """
+def search_tasks(keyword=None, start_date=None, end_date=None):
     sql = """
         SELECT t.id, t.title, t.date,
                COUNT(p.id) AS people,
@@ -196,7 +190,7 @@ def search_task(keyword=None, start_date=None, end_date=None):
     params = []
     if keyword:
         sql += " AND t.title LIKE ?"
-        params.append(keyword)
+        params.append(f"%{keyword}%")
     if start_date:
         sql += " AND t.date >= ?"
         params.append(start_date)
@@ -204,21 +198,93 @@ def search_task(keyword=None, start_date=None, end_date=None):
         sql += " AND t.date <= ?"
         params.append(end_date)
     sql += " GROUP BY t.id ORDER BY t.date DESC"
+
     conn = get_conn()
     rows = conn.execute(sql, params).fetchall()
     conn.close()
     return [dict(r) for r in rows]
 
 
+# ==================== 参与记录 ====================
+
+def batch_add_hours(task_id, member_ids, hours):
+    """为已存在任务批量添加时长。返回 (成功数, 跳过数)。"""
+    conn = get_conn()
+    try:
+        task = conn.execute("SELECT id FROM tasks WHERE id = ?", (task_id,)).fetchone()
+        if not task:
+            raise ValueError("任务不存在")
+
+        success, skipped = 0, 0
+        for mid in member_ids:
+            exists = conn.execute(
+                "SELECT 1 FROM members WHERE id = ?", (mid,)
+            ).fetchone()
+            if not exists:
+                skipped += 1
+                continue
+            try:
+                conn.execute(
+                    "INSERT INTO participations (task_id, member_id, hours) VALUES (?, ?, ?)",
+                    (task_id, mid, hours),
+                )
+                success += 1
+            except sqlite3.IntegrityError:
+                skipped += 1
+        conn.commit()
+        return success, skipped
+    finally:
+        conn.close()
+
+
+def upsert_participation(task_id, member_id, hours):
+    """补录：存在则更新，不存在则新增。返回 'added' 或 'updated'。"""
+    conn = get_conn()
+    try:
+        existing = conn.execute(
+            "SELECT id FROM participations WHERE task_id = ? AND member_id = ?",
+            (task_id, member_id),
+        ).fetchone()
+        if existing:
+            conn.execute(
+                "UPDATE participations SET hours = ? WHERE task_id = ? AND member_id = ?",
+                (hours, task_id, member_id),
+            )
+            action = "updated"
+        else:
+            conn.execute(
+                "INSERT INTO participations (task_id, member_id, hours) VALUES (?, ?, ?)",
+                (task_id, member_id, hours),
+            )
+            action = "added"
+        conn.commit()
+        return action
+    finally:
+        conn.close()
+
+
+def remove_participation(task_id, member_id):
+    """移除某人在某任务中的参与记录。返回是否删除成功。"""
+    conn = get_conn()
+    try:
+        cur = conn.execute(
+            "DELETE FROM participations WHERE task_id = ? AND member_id = ?",
+            (task_id, member_id),
+        )
+        conn.commit()
+        return cur.rowcount > 0
+    finally:
+        conn.close()
+
+
+# ==================== 统计 ====================
+
 def summary_all():
-    """
-    列出全体时长信息
-    """
     conn = get_conn()
     rows = conn.execute("""
         SELECT m.id, m.name,
-            IFNULL(SUM(p.hours), 0) AS total_hours,
-            COUNT(p.id) AS task_count
+               IFNULL(SUM(p.hours), 0) AS total_hours,
+               COUNT(p.id) AS task_count
         FROM members m
         LEFT JOIN participations p ON p.member_id = m.id
         GROUP BY m.id
@@ -229,15 +295,12 @@ def summary_all():
 
 
 def summary_member(member_id):
-    """
-    列出某个成员的时长信息
-    :param member_id: 成员ID
-    """
     conn = get_conn()
     member = conn.execute("SELECT * FROM members WHERE id = ?", (member_id,)).fetchone()
     if not member:
         conn.close()
         return None
+
     rows = conn.execute("""
         SELECT t.title, t.date, p.hours
         FROM participations p
@@ -249,47 +312,41 @@ def summary_member(member_id):
     return {"member": dict(member), "records": [dict(r) for r in rows]}
 
 
-def upsert_participation(task_id, member_id, hours):
-    """
-    补录时长或成员
-    :param task_id: 任务ID
-    :param member_id: 成员ID
-    :param hours: 要修改的时长
-    """
-    conn = get_conn()
-    try:
-        existing = conn.execute(
-            "SELECT id FROM participations WHERE task_id = ? AND member_id = ?",
-            (task_id, member_id)
-        ).fetchone()
-        if existing:
-            conn.execute(
-                "UPDATE participations SET hours = ? WHERE task_id = ? AND member_id = ?",
-                (hours, task_id, member_id)
-            )
-            action = "updated"
-        else:
-            conn.execute(
-                "INSERT INTO participations (task_id, member_id, hours) VALUES (?, ?, ?)",
-                (task_id, member_id, hours)
-            )
-            action = "added"
-        conn.commit()
-        return action
-    finally:
-        conn.close()
+# ==================== 工具 ====================
 
+def humanize_date(date_str):
+    """把 YYYY-MM-DD 转成 '3 天前' 这样的字符串。"""
+    try:
+        target = datetime.strptime(date_str, "%Y-%m-%d").date()
+    except ValueError:
+        return date_str
+
+    today = datetime.now().date()
+    delta = (today - target).days
+
+    if delta < 0:
+        return f"{-delta} 天后"
+    if delta == 0:
+        return "今天"
+    if delta == 1:
+        return "昨天"
+    if delta < 30:
+        return f"{delta} 天前"
+    if delta < 365:
+        return f"{delta // 30} 个月前"
+    return f"{delta // 365} 年前"
+
+
+# ==================== 导出 ====================
 
 def export_summary_csv(path=None):
-    """
-    导出全体成员时长到csv
-    :param path: 存储csv的路径
-    """
+    """导出汇总 CSV。path 为 None 用默认路径。"""
     if path is None:
         path = BASE_DIR / "exports" / "summary.csv"
     else:
         path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
+
     rows = summary_all()
     with open(path, "w", newline="", encoding="utf-8-sig") as f:
         writer = csv.writer(f)
@@ -300,19 +357,18 @@ def export_summary_csv(path=None):
 
 
 def export_tasks_csv(path=None):
-    """
-    导出任务列表到csv
-    :param path: 存储csv的路径
-    """
+    """导出任务 CSV。path 为 None 用默认路径。"""
     if path is None:
         path = BASE_DIR / "exports" / "tasks.csv"
     else:
         path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
+
     rows = list_tasks()
     with open(path, "w", newline="", encoding="utf-8-sig") as f:
         writer = csv.writer(f)
-        writer.writerow(["ID", "日期", "任务名称", "人数", " 总时长"])
+        writer.writerow(["ID", "日期", "任务名称", "人数", "总时长"])
         for r in rows:
-            writer.writerow([r["id"], r["date"], r["title"], r["people"], r["total_hours"]])
+            writer.writerow([r["id"], r["date"], r["title"],
+                             r["people"], r["total_hours"]])
     return path
