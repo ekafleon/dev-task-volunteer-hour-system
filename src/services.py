@@ -13,12 +13,15 @@ from src.config import BASE_DIR, DB_PATH
 
 # ==================== 成员 ====================
 
-def add_member(name, note=""):
+def add_member(name, note="", group_name=""):
     conn = get_conn()
     try:
-        conn.execute("INSERT INTO members (name, note) VALUES (?, ?)", (name, note))
+        conn.execute(
+            "INSERT INTO members (name, note, group_name) VALUES (?, ?, ?)",
+            (name, note, group_name)
+        )
         conn.commit()
-        logger.info(f"添加成员 {name}")
+        logger.info(f"添加成员 {name} （小组：{group_name or '无'}）")
     except sqlite3.IntegrityError:
         raise ValueError(f"成员「{name}」已存在")
     finally:
@@ -27,12 +30,14 @@ def add_member(name, note=""):
 
 def list_members():
     conn = get_conn()
-    rows = conn.execute("SELECT id, name, note FROM members ORDER BY id").fetchall()
+    rows = conn.execute(
+        "SELECT id, name, note, group_name FROM members ORDER BY id"
+    ).fetchall()
     conn.close()
     return [dict(r) for r in rows]
 
 
-def update_member(member_id, name=None, note=None):
+def update_member(member_id, name=None, note=None, group_name=None):
     """修改成员。参数为 None 时保持原值。找不到返回 None。"""
     conn = get_conn()
     try:
@@ -44,17 +49,20 @@ def update_member(member_id, name=None, note=None):
 
         new_name = name if name is not None else member["name"]
         new_note = note if note is not None else member["note"]
+        new_group = group_name if group_name is not None else member["group_name"]
 
         try:
             conn.execute(
-                "UPDATE members SET name = ?, note = ? WHERE id = ?",
-                (new_name, new_note, member_id),
+                "UPDATE members SET name = ?, note = ?, group_name = ? WHERE id = ?",
+                (new_name, new_note, new_group, member_id),
             )
             conn.commit()
+            logger.info(f"修改成员 id={member_id}")
         except sqlite3.IntegrityError:
             raise ValueError(f"成员名「{new_name}」已存在")
 
-        return {"id": member_id, "name": new_name, "note": new_note}
+        return {"id": member_id, "name": new_name,
+                "note": new_note, "group_name": new_group}
     finally:
         conn.close()
 
@@ -86,8 +94,29 @@ def search_members(keyword):
     """按姓名模糊搜索。"""
     conn = get_conn()
     rows = conn.execute(
-        "SELECT id, name, note FROM members WHERE name LIKE ? ORDER BY id",
+        "SELECT id, name, note, group_name FROM members WHERE name LIKE ? ORDER BY id",
         (f"%{keyword}%",),
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def list_groups():
+    """返回所有小组名（去重，按名称排序）。"""
+    conn = get_conn()
+    rows = conn.execute(
+        "SELECT DISTINCT group_name FROM members WHERE group_name != '' ORDER BY group_name"
+    ).fetchall()
+    conn.close()
+    return [r["group_name"] for r in rows]
+
+
+def list_members_by_group(group_name):
+    """按小组查成员。group_name 为空字符串时查未分组。"""
+    conn = get_conn()
+    rows = conn.execute(
+        "SELECT id, name, note, group_name FROM members WHERE group_name = ? ORDER BY id",
+        (group_name,),
     ).fetchall()
     conn.close()
     return [dict(r) for r in rows]
@@ -231,7 +260,8 @@ def batch_add_hours(task_id, member_ids, hours):
                 continue
             try:
                 conn.execute(
-                    "INSERT INTO participations (task_id, member_id, hours) VALUES (?, ?, ?)",
+                    "INSERT INTO participations (task_id, member_id, hours) \
+                        VALUES (?, ?, ?)",
                     (task_id, mid, hours),
                 )
                 success += 1

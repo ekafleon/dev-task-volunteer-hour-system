@@ -19,7 +19,8 @@ def init_db():
         CREATE TABLE IF NOT EXISTS members (
             id      INTEGER PRIMARY KEY AUTOINCREMENT,
             name    TEXT NOT NULL UNIQUE,
-            note    TEXT NOT NULL DEFAULT ''
+            note    TEXT NOT NULL DEFAULT '',
+            group_name TEXT NOT NULL DEFAULT ''
         );
 
         CREATE TABLE IF NOT EXISTS tasks (
@@ -44,5 +45,10 @@ def init_db():
         CREATE INDEX IF NOT EXISTS idx_part_task   ON participations(task_id);
         CREATE INDEX IF NOT EXISTS idx_tasks_date  ON tasks(date);
     """)
+    cols = conn.execute("PRAGMA table_info(members)").fetchall()
+    col_names = [c["name"] for c in cols]
+    if "group_name" not in col_names:
+        conn.execute("ALTER TABLE members \
+                     ADD COLUMN group_name TEXT NOT NULL DEFAULT ''")
     conn.commit()
     conn.close()
