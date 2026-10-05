@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# 虚拟环境
+venv/
+.venv/
+env/
+
+# PyCharm
+.idea/
+*.iml
+
+# 数据与运行时产物
+data/
+backups/
+exports/
+logs/
+*.db
+*.db-wal
+*.db-shm
+app.log
+
