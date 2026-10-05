@@ -2,22 +2,22 @@
 
 import sys
 
-from src.cli import main_menu
 from src.db import init_db
+from src.cli import main_menu
+from src.logger import logger
+
 
 
 def main():
     init_db()
-    if "--gui" in sys.argv:
-        try:
-            from src.gui import launch
-            launch()
-        except ImportError as e:
-            print(f"GUI 启动失败，回退 CLI：{e}")
-            main_menu()
-    else:
-        main_menu()
+    main_menu()
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        print("\n已退出")
+    except Exception as e:
+        logger.exception("未处理异常")
+        print(f"出错了: {e}")

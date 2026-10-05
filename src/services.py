@@ -7,6 +7,7 @@ from datetime import datetime
 from pathlib import Path
 
 from src.db import get_conn
+from src.logger import logger
 from src.config import BASE_DIR, DB_PATH
 
 
@@ -17,6 +18,7 @@ def add_member(name, note=""):
     try:
         conn.execute("INSERT INTO members (name, note) VALUES (?, ?)", (name, note))
         conn.commit()
+        logger.info(f"添加成员 {name}")
     except sqlite3.IntegrityError:
         raise ValueError(f"成员「{name}」已存在")
     finally:
@@ -74,6 +76,7 @@ def delete_member(member_id):
 
         conn.execute("DELETE FROM members WHERE id = ?", (member_id,))
         conn.commit()
+        logger.info(f"删除成员 {member["name"]}, 移除 {cnt} 条参与记录")
         return {"name": member["name"], "removed_records": cnt}
     finally:
         conn.close()
@@ -106,6 +109,7 @@ def add_task(title, description, date, participations):
             [(task_id, mid, h) for mid, h in participations],
         )
         conn.commit()
+        logger.info(f"登记任务 {title}, 参与者 {len(participations)} 人")
         return task_id
     finally:
         conn.close()
@@ -177,6 +181,7 @@ def delete_task(task_id):
     conn.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
     conn.commit()
     conn.close()
+    logger.info(f"删除任务 id={task_id}")
 
 
 def search_tasks(keyword=None, start_date=None, end_date=None):
@@ -382,4 +387,5 @@ def backup_db():
     name = f"backup_{datetime.now():%Y%m%d_%H%M%S}.db"
     path = backup_dir / name
     shutil.copy(DB_PATH, path)
+    logger.info(f"备份数据库到 {path}")
     return path
