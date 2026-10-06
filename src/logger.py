@@ -6,7 +6,6 @@
 """
 
 import logging
-from pathlib import Path
 
 from src.config import BASE_DIR
 
