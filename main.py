@@ -1,5 +1,11 @@
 # main.py
 # -*- coding: utf-8 -*-
+"""程序入口。
+
+支持两种运行方式：
+1. 默认启动命令行菜单。
+2. 通过子命令直接执行特定操作（如 summary、add-member 等）。
+"""
 
 import argparse
 import sys
@@ -9,6 +15,11 @@ from src.logger import logger
 
 
 def build_parser():
+    """构建命令行参数解析器。
+
+    Returns:
+        argparse.ArgumentParser: 配置好的解析器。
+    """
     parser = argparse.ArgumentParser(
         description="开发组任务登记及志愿时长分配系统"
     )
@@ -31,6 +42,14 @@ def build_parser():
 
 
 def run_command(args):
+    """根据解析后的参数执行对应的命令。
+
+    Args:
+        args (argparse.Namespace): 解析后的参数对象。
+
+    Returns:
+        bool: 如果执行了命令返回 True，否则 False。
+    """
     from src import services
 
     if args.cmd == "summary":
@@ -68,6 +87,7 @@ def run_command(args):
 
 
 def main():
+    """主函数：初始化数据库，解析参数，分发执行。"""
     init_db()
     parser = build_parser()
     args = parser.parse_args()

@@ -1,4 +1,9 @@
 # src/services.py
+"""业务逻辑层。
+
+处理成员、任务、参与记录、统计、导出和备份等核心业务。
+所有数据库操作均通过 db.get_conn() 获取连接，并保证连接关闭。
+"""
 
 import csv
 import shutil
@@ -14,6 +19,16 @@ from src.config import BASE_DIR, DB_PATH
 # ==================== 成员 ====================
 
 def add_member(name, note="", group_name=""):
+    """添加一个新成员。
+
+    Args:
+        name (str): 成员姓名，必须唯一。
+        note (str, optional): 备注，默认为空字符串。
+        group_name (str, optional): 组名，默认为空字符串，表现为（未分组）。
+
+    Raises:
+        ValueError: 如果姓名已存在。
+    """
     conn = get_conn()
     try:
         conn.execute(
@@ -28,7 +43,12 @@ def add_member(name, note="", group_name=""):
         conn.close()
 
 
-def list_members():
+def list_members() -> list[dict]:
+    """列出数据库中全部成员。
+
+    Returns:
+        list[dict]: 每个元素包含 id, name, note, group_name 四个键。
+    """
     conn = get_conn()
     rows = conn.execute(
         "SELECT id, name, note, group_name FROM members ORDER BY id"
@@ -38,7 +58,21 @@ def list_members():
 
 
 def update_member(member_id, name=None, note=None, group_name=None):
-    """修改成员。参数为 None 时保持原值。找不到返回 None。"""
+    """修改成员。参数为 None 时保持原值。找不到返回 None。
+
+    Args:
+        member_id (int): 成员ID。
+        name (str, optional): 成员姓名，可选修改项。
+        note (str, optional): 成员备注，可选修改项。
+        group_name (str, optional): 成员组别，可选修改项。
+
+    Returns:
+        dict | None: 成功时返回包含 id, name, note, group_name 的字典；
+                     找不到成员时返回 None。
+
+    Raises:
+        ValueError: 如果成员名与现有成员名重复。
+    """
     conn = get_conn()
     try:
         member = conn.execute(
@@ -68,7 +102,15 @@ def update_member(member_id, name=None, note=None, group_name=None):
 
 
 def delete_member(member_id):
-    """删除成员，级联删除参与记录。返回信息或 None。"""
+    """删除成员，级联删除参与记录。返回信息或 None。
+
+    Args:
+        member_id (int): 成员ID。
+
+    Returns:
+        dict | None: 成功时返回 {"name": 成员名, "removed_records": 删除的参与记录数}；
+                     找不到成员时返回 None。
+    """
     conn = get_conn()
     try:
         member = conn.execute(
@@ -91,7 +133,14 @@ def delete_member(member_id):
 
 
 def search_members(keyword):
-    """按姓名模糊搜索。"""
+    """按姓名模糊搜索成员。
+
+    Args:
+        keyword (str): 搜索关键词，用于匹配姓名。
+
+    Returns:
+        list[dict]: 匹配的成员列表，每个字典包含 id, name, note, group_name。
+    """
     conn = get_conn()
     rows = conn.execute(
         "SELECT id, name, note, group_name FROM members WHERE name LIKE ? ORDER BY id",
@@ -102,7 +151,11 @@ def search_members(keyword):
 
 
 def list_groups():
-    """返回所有小组名（去重，按名称排序）。"""
+    """返回所有小组名（去重，按名称排序）。
+
+    Returns:
+        list[str]: 小组名称列表。
+    """
     conn = get_conn()
     rows = conn.execute(
         "SELECT DISTINCT group_name FROM members WHERE group_name != '' ORDER BY group_name"
@@ -112,7 +165,14 @@ def list_groups():
 
 
 def list_members_by_group(group_name):
-    """按小组查成员。group_name 为空字符串时查未分组。"""
+    """按小组查询成员。group_name 为空字符串时查询未分组。
+
+    Args:
+        group_name (str): 小组名称，空字符串表示未分组。
+
+    Returns:
+        list[dict]: 成员列表，每个字典包含 id, name, note, group_name。
+    """
     conn = get_conn()
     rows = conn.execute(
         "SELECT id, name, note, group_name FROM members WHERE group_name = ? ORDER BY id",
@@ -125,7 +185,18 @@ def list_members_by_group(group_name):
 # ==================== 任务 ====================
 
 def add_task(title, description, date, participations):
-    """participations: [(member_id, hours), ...]"""
+    """添加任务及其参与记录。
+
+    Args:
+        title (str): 任务标题。
+        description (str): 任务描述。
+        date (str): 任务日期，格式 YYYY-MM-DD。
+        participations (list[tuple[int, float]]): 参与者列表，
+            每个元素为 (成员ID, 时长)。
+
+    Returns:
+        int: 新插入任务的 ID。
+    """
     conn = get_conn()
     try:
         cur = conn.execute(
@@ -145,6 +216,11 @@ def add_task(title, description, date, participations):
 
 
 def list_tasks():
+    """列出所有任务，包含参与人数和总时长，并计算距今时间。
+
+    Returns:
+        list[dict]: 每个字典包含 id, title, date, people, total_hours, ago。
+    """
     conn = get_conn()
     rows = conn.execute("""
         SELECT t.id, t.title, t.date,
@@ -166,6 +242,15 @@ def list_tasks():
 
 
 def get_task_detail(task_id):
+    """获取任务详情及参与者列表。
+
+    Args:
+        task_id (int): 任务 ID。
+
+    Returns:
+        dict | None: 包含 "task" 和 "participants" 两个键的字典；
+                     找不到任务返回 None。
+    """
     conn = get_conn()
     task = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
     if not task:
@@ -184,6 +269,17 @@ def get_task_detail(task_id):
 
 
 def update_task(task_id, title=None, description=None, date=None):
+    """修改任务信息。参数为 None 时保持原值。找不到返回 None。
+
+    Args:
+        task_id (int): 任务 ID。
+        title (str, optional): 新标题。
+        description (str, optional): 新描述。
+        date (str, optional): 新日期。
+
+    Returns:
+        dict | None: 更新后的任务信息字典，找不到返回 None。
+    """
     conn = get_conn()
     try:
         task = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
@@ -206,6 +302,11 @@ def update_task(task_id, title=None, description=None, date=None):
 
 
 def delete_task(task_id):
+    """删除任务及其所有参与记录（级联删除）。
+
+    Args:
+        task_id (int): 任务 ID。
+    """
     conn = get_conn()
     conn.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
     conn.commit()
@@ -214,6 +315,16 @@ def delete_task(task_id):
 
 
 def search_tasks(keyword=None, start_date=None, end_date=None):
+    """按关键词和日期范围搜索任务。
+
+    Args:
+        keyword (str, optional): 标题关键词。
+        start_date (str, optional): 起始日期 YYYY-MM-DD。
+        end_date (str, optional): 结束日期 YYYY-MM-DD。
+
+    Returns:
+        list[dict]: 任务列表，每个字典包含 id, title, date, people, total_hours。
+    """
     sql = """
         SELECT t.id, t.title, t.date,
                COUNT(p.id) AS people,
@@ -243,7 +354,19 @@ def search_tasks(keyword=None, start_date=None, end_date=None):
 # ==================== 参与记录 ====================
 
 def batch_add_hours(task_id, member_ids, hours):
-    """为已存在任务批量添加时长。返回 (成功数, 跳过数)。"""
+    """为已存在任务批量添加时长。
+
+    Args:
+        task_id (int): 任务 ID。
+        member_ids (list[int]): 成员 ID 列表。
+        hours (float): 统一时长。
+
+    Returns:
+        tuple[int, int]: (成功添加数, 跳过数)。
+
+    Raises:
+        ValueError: 如果任务不存在。
+    """
     conn = get_conn()
     try:
         task = conn.execute("SELECT id FROM tasks WHERE id = ?", (task_id,)).fetchone()
@@ -274,7 +397,16 @@ def batch_add_hours(task_id, member_ids, hours):
 
 
 def upsert_participation(task_id, member_id, hours):
-    """补录：存在则更新，不存在则新增。返回 'added' 或 'updated'。"""
+    """补录参与记录：存在则更新，不存在则新增。
+
+    Args:
+        task_id (int): 任务 ID。
+        member_id (int): 成员 ID。
+        hours (float): 时长。
+
+    Returns:
+        str: 'added' 表示新增，'updated' 表示更新。
+    """
     conn = get_conn()
     try:
         existing = conn.execute(
@@ -300,7 +432,15 @@ def upsert_participation(task_id, member_id, hours):
 
 
 def remove_participation(task_id, member_id):
-    """移除某人在某任务中的参与记录。返回是否删除成功。"""
+    """移除某人在某任务中的参与记录。
+
+    Args:
+        task_id (int): 任务 ID。
+        member_id (int): 成员 ID。
+
+    Returns:
+        bool: 删除成功返回 True，否则 False。
+    """
     conn = get_conn()
     try:
         cur = conn.execute(
@@ -317,6 +457,11 @@ def remove_participation(task_id, member_id):
 # ==================== 统计 ====================
 
 def summary_all():
+    """全体成员时长汇总。
+
+    Returns:
+        list[dict]: 每个字典包含 id, name, total_hours, task_count。
+    """
     conn = get_conn()
     rows = conn.execute("""
         SELECT m.id, m.name,
@@ -332,6 +477,15 @@ def summary_all():
 
 
 def summary_member(member_id):
+    """指定成员的时长明细及总计。
+
+    Args:
+        member_id (int): 成员 ID。
+
+    Returns:
+        dict | None: 包含 "member" 和 "records" 的字典；
+                     找不到成员返回 None。
+    """
     conn = get_conn()
     member = conn.execute("SELECT * FROM members WHERE id = ?", (member_id,)).fetchone()
     if not member:
@@ -349,10 +503,87 @@ def summary_member(member_id):
     return {"member": dict(member), "records": [dict(r) for r in rows]}
 
 
+def summary_by_month():
+    """按月统计任务数和总时长。
+
+    Returns:
+        list[dict]: 每个字典包含 month, task_count, total_hours。
+    """
+    conn = get_conn()
+    rows = conn.execute("""
+        SELECT substr(t.date, 1, 7) AS month,
+               COUNT(DISTINCT t.id) AS task_count,
+               IFNULL(SUM(p.hours), 0) AS total_hours
+        FROM tasks t
+        LEFT JOIN participations p ON p.task_id = t.id
+        GROUP BY month
+        ORDER BY month DESC
+    """).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def summary_by_group():
+    """按小组统计人数和总时长。
+
+    Returns:
+        list[dict]: 每个字典包含 group_name, member_count, total_hours。
+    """
+    conn = get_conn()
+    rows = conn.execute("""
+        SELECT m.group_name,
+               COUNT(DISTINCT m.id) AS member_count,
+               IFNULL(SUM(p.hours), 0) AS total_hours
+        FROM members m
+        LEFT JOIN participations p ON p.member_id = m.id
+        GROUP BY m.group_name
+        ORDER BY total_hours DESC
+    """).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def never_participated():
+    """从未参与任何任务的成员。
+
+    Returns:
+        list[dict]: 每个字典包含 id, name, group_name。
+    """
+    conn = get_conn()
+    rows = conn.execute("""
+        SELECT m.id, m.name, m.group_name
+        FROM members m
+        LEFT JOIN participations p ON p.member_id = m.id
+        WHERE p.id IS NULL
+        ORDER BY m.id
+    """).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def top_members(n=10):
+    """时长排行榜前 n 名。
+
+    Args:
+        n (int): 返回的成员数量，默认 10。
+
+    Returns:
+        list[dict]: 汇总列表的前 n 项。
+    """
+    return summary_all()[:n]
+
+
 # ==================== 工具 ====================
 
 def humanize_date(date_str):
-    """把 YYYY-MM-DD 转成 '3 天前' 这样的字符串。"""
+    """将日期字符串转换为“x 天前”等易读格式。
+
+    Args:
+        date_str (str): 日期字符串，格式 YYYY-MM-DD。
+
+    Returns:
+        str: 易读的时间描述，如“今天”、“3 天前”。
+    """
     try:
         target = datetime.strptime(date_str, "%Y-%m-%d").date()
     except ValueError:
@@ -377,7 +608,15 @@ def humanize_date(date_str):
 # ==================== 导出 ====================
 
 def export_summary_csv(path=None):
-    """导出汇总 CSV。path 为 None 用默认路径。"""
+    """导出汇总数据为 CSV 文件。
+
+    Args:
+        path (str | Path, optional): 导出路径，为 None 时使用默认路径
+            (exports/summary.csv)。
+
+    Returns:
+        Path: 实际导出的文件路径。
+    """
     if path is None:
         path = BASE_DIR / "exports" / "summary.csv"
     else:
@@ -394,7 +633,15 @@ def export_summary_csv(path=None):
 
 
 def export_tasks_csv(path=None):
-    """导出任务 CSV。path 为 None 用默认路径。"""
+    """导出任务列表为 CSV 文件。
+
+    Args:
+        path (str | Path, optional): 导出路径，为 None 时使用默认路径
+            (exports/tasks.csv)。
+
+    Returns:
+        Path: 实际导出的文件路径。
+    """
     if path is None:
         path = BASE_DIR / "exports" / "tasks.csv"
     else:
@@ -412,7 +659,11 @@ def export_tasks_csv(path=None):
 
 
 def backup_db():
-    """备份数据库到 backups/ 目录。返回备份文件路径。"""
+    """备份数据库到 backups/ 目录。
+
+    Returns:
+        Path: 备份文件的完整路径。
+    """
     backup_dir = BASE_DIR / "backups"
     backup_dir.mkdir(parents=True, exist_ok=True)
     name = f"backup_{datetime.now():%Y%m%d_%H%M%S}.db"
@@ -420,54 +671,3 @@ def backup_db():
     shutil.copy(DB_PATH, path)
     logger.info(f"备份数据库到 {path}")
     return path
-
-
-def summary_by_month():
-    """按月统计：月份、任务数、总时长。"""
-    conn = get_conn()
-    rows = conn.execute("""
-        SELECT substr(t.date, 1, 7) AS month,
-               COUNT(DISTINCT t.id) AS task_count,
-               IFNULL(SUM(p.hours), 0) AS total_hours
-        FROM tasks t
-        LEFT JOIN participations p ON p.task_id = t.id
-        GROUP BY month
-        ORDER BY month DESC
-    """).fetchall()
-    conn.close()
-    return [dict(r) for r in rows]
-
-
-def summary_by_group():
-    """按小组统计：小组、人数、总时长。"""
-    conn = get_conn()
-    rows = conn.execute("""
-        SELECT m.group_name,
-               COUNT(DISTINCT m.id) AS member_count,
-               IFNULL(SUM(p.hours), 0) AS total_hours
-        FROM members m
-        LEFT JOIN participations p ON p.member_id = m.id
-        GROUP BY m.group_name
-        ORDER BY total_hours DESC
-    """).fetchall()
-    conn.close()
-    return [dict(r) for r in rows]
-
-
-def never_participated():
-    """从未参与任何任务的成员。"""
-    conn = get_conn()
-    rows = conn.execute("""
-        SELECT m.id, m.name, m.group_name
-        FROM members m
-        LEFT JOIN participations p ON p.member_id = m.id
-        WHERE p.id IS NULL
-        ORDER BY m.id
-    """).fetchall()
-    conn.close()
-    return [dict(r) for r in rows]
-
-
-def top_members(n=10):
-    """时长排行榜前 n 名。"""
-    return summary_all()[:n]
