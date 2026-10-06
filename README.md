@@ -92,7 +92,7 @@ python3 main.py backup                     # 备份数据库
 python3 main.py export-summary             # 导出汇总 CSV
 ```
 
-###数据库路径
+### 数据库路径
 
 默认数据库位于 `项目目录/data/app.db` ，可通过环境变量覆盖：
 
