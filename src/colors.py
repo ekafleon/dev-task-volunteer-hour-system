@@ -108,8 +108,8 @@ def pad(text, width, align="left"):
 
 
 def clear():
-    """清空终端屏幕。"""
-    os.system("cls" if os.name == "nt" else "clear")
+    """清屏。用 ANSI 转义序列，不依赖 clear 命令。"""
+    print("\033[H\033[2J\033[3J", end="", flush=True)
 
 
 def pause(msg="\n按回车返回..."):
