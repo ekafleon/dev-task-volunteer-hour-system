@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>任务登记及志愿时长分配系统</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            font-family: "Microsoft YaHei", "PingFang SC", Arial, sans-serif;
+            background: #f5f6fa;
+            margin: 0;
+            padding: 24px;
+            color: #1f2937;
+        }
+        h1 { font-size: 1.6rem; margin: 0 0 20px; }
+        .tabs {
+            display: flex;
+            gap: 4px;
+            border-bottom: 2px solid #e5e7eb;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+        .tab {
+            padding: 10px 18px;
+            cursor: pointer;
+            border: none;
+            background: none;
+            font-size: 15px;
+            color: #6b7280;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -2px;
+            font-family: inherit;
+        }
+        .tab:hover { color: #4a6cf7; }
+        .tab.active {
+            color: #4a6cf7;
+            border-bottom-color: #4a6cf7;
+            font-weight: bold;
+        }
+        .card {
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,.06);
+            padding: 20px;
+            overflow-x: auto;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+        th, td {
+            padding: 10px 12px;
+            text-align: left;
+            border-bottom: 1px solid #eef1f8;
+        }
+        th {
+            background: #f9fafb;
+            font-weight: 600;
+            color: #374151;
+        }
+        tr:hover td { background: #f9fafb; }
+        .text-danger { color: #dc2626; }
+        .empty { color: #9ca3af; padding: 20px; text-align: center; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>任务登记及志愿时长分配系统</h1>
+
+    <div class="tabs">
+        <button class="tab active" data-tab="summary">汇总</button>
+        <button class="tab" data-tab="members">成员</button>
+        <button class="tab" data-tab="tasks">任务</button>
+        <button class="tab" data-tab="month">按月</button>
+        <button class="tab" data-tab="group">按组</button>
+        <button class="tab" data-tab="top">排行榜</button>
+    </div>
+
+    <div class="card">
+        <div id="content" class="empty">加载中...</div>
+    </div>
+</div>
+
+<script>
+async function fetchJSON(url) {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
+}
+
+function renderTable(headers, rows) {
+    if (!rows.length) return '<div class="empty">暂无数据</div>';
+    let html = '<table><thead><tr>';
+    for (const h of headers) html += `<th>${h}</th>`;
+    html += '</tr></thead><tbody>';
+    for (const row of rows) {
+        html += '<tr>';
+        for (const cell of row) html += `<td>${cell ?? ''}</td>`;
+        html += '</tr>';
+    }
+    html += '</tbody></table>';
+    return html;
+}
+
+async function loadSummary() {
+    const data = await fetchJSON('/api/summary');
+    const rows = data.map(r => [r.id, r.name, r.group_name || '未分组', r.task_count, r.total_hours + ' 小时']);
+    document.getElementById('content').innerHTML =
+        renderTable(['ID', '姓名', '小组', '任务数', '总时长'], rows);
+}
+
+async function loadMembers() {
+    const data = await fetchJSON('/api/members');
+    const rows = data.map(m => [m.id, m.name, m.group_name || '未分组', m.note]);
+    document.getElementById('content').innerHTML =
+        renderTable(['ID', '姓名', '小组', '备注'], rows);
+}
+
+async function loadTasks() {
+    const data = await fetchJSON('/api/tasks');
+    const rows = data.map(t => [t.id, t.date, t.title, t.people, t.total_hours + ' 小时']);
+    document.getElementById('content').innerHTML =
+        renderTable(['ID', '日期', '任务名称', '人数', '总时长'], rows);
+}
+
+async function loadMonth() {
+    const data = await fetchJSON('/api/summary-by-month');
+    const rows = data.map(r => [r.month, r.task_count, r.total_hours + ' 小时']);
+    document.getElementById('content').innerHTML =
+        renderTable(['月份', '任务数', '总时长'], rows);
+}
+
+async function loadGroup() {
+    const data = await fetchJSON('/api/summary-by-group');
+    const rows = data.map(r => [r.group_name || '未分组', r.member_count, r.total_hours + ' 小时']);
+    document.getElementById('content').innerHTML =
+        renderTable(['小组', '人数', '总时长'], rows);
+}
+
+async function loadTop() {
+    const data = await fetchJSON('/api/top-members');
+    const rows = data.map((r, i) => [i + 1, r.name, r.task_count, r.total_hours + ' 小时']);
+    document.getElementById('content').innerHTML =
+        renderTable(['排名', '姓名', '任务数', '总时长'], rows);
+}
+
+const loaders = {
+    summary: loadSummary,
+    members: loadMembers,
+    tasks: loadTasks,
+    month: loadMonth,
+    group: loadGroup,
+    top: loadTop,
+};
+
+document.querySelectorAll('.tab').forEach(el => {
+    el.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+        el.classList.add('active');
+        loaders[el.dataset.tab]().catch(err => {
+            document.getElementById('content').innerHTML =
+                `<div class="text-danger">加载失败：${err.message}</div>`;
+        });
+    });
+});
+
+loadSummary().catch(err => {
+    document.getElementById('content').innerHTML =
+        `<div class="text-danger">加载失败：${err.message}</div>`;
+});
+</script>
+</body>
+</html>
